@@ -64,6 +64,9 @@ Optional files in `~/.wisper/`:
 asr_model = "mlx-community/parakeet-tdt-0.6b-v2"
 llm_model = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
 llm_polish = true
+llm_backend = "mlx"     # "mlx" (in-process, default) or "ollama" (local daemon)
+ollama_model = "llama3.2"
+ollama_url = "http://localhost:11434"
 hotkey = "alt_r"        # alt_r, alt_l, cmd_r, ctrl_r, f13
 min_utterance_seconds = 0.3
 filler_words = ["um", "uh", "erm", "you know", "i mean"]
@@ -88,7 +91,7 @@ Design doc: [docs/superpowers/specs/2026-07-02-local-wispr-clone-design.md](docs
 | `asr.py` | Parakeet MLX transcription (in-memory, no ffmpeg) |
 | `cleanup.py` | deterministic filler/whitespace rules |
 | `dictionary.py` | personal term replacements |
-| `polish.py` | optional local-LLM rewrite with tone hint |
+| `polish.py` | optional local-LLM rewrite with tone hint (mlx-lm or Ollama backend) |
 | `context.py` | frontmost app → tone |
 | `hotkey.py` | pynput push-to-talk |
 | `paste.py` | clipboard-swap ⌘V insertion |

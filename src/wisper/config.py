@@ -15,6 +15,9 @@ class Config:
     asr_model: str = "mlx-community/parakeet-tdt-0.6b-v2"
     llm_model: str = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
     llm_polish: bool = True
+    llm_backend: str = "mlx"  # "mlx" or "ollama"
+    ollama_model: str = "llama3.2"
+    ollama_url: str = "http://localhost:11434"
     hotkey: str = "alt_r"
     min_utterance_seconds: float = 0.3
     filler_words: list[str] = field(default_factory=lambda: list(DEFAULT_FILLERS))

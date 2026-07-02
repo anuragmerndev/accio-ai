@@ -1,4 +1,12 @@
-"""Optional LLM polish pass: tone, self-corrections, punctuation via a small local model."""
+"""Optional LLM polish pass: tone, self-corrections, punctuation via a small local model.
+
+Two interchangeable backends, both fully local:
+- MlxPolisher: mlx-lm in-process (default, no daemon needed)
+- OllamaPolisher: local Ollama daemon over localhost HTTP
+"""
+
+import json
+import urllib.request
 
 TONE_HINTS = {
     "chat": "Keep it casual and short, like a chat message.",
@@ -20,6 +28,20 @@ def build_prompt(transcript: str, tone: str) -> str:
     return f"{hint}\n\nDictated speech:\n{transcript}"
 
 
+def build_messages(transcript: str, tone: str) -> list[dict[str, str]]:
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": build_prompt(
+                "um so the meeting is at three no wait four pm", "default"
+            ),
+        },
+        {"role": "assistant", "content": "The meeting is at 4 pm."},
+        {"role": "user", "content": build_prompt(transcript, tone)},
+    ]
+
+
 def sanitize_output(text: str) -> str:
     text = text.strip().split("\n\n")[0].strip()
     if len(text) >= 2 and text[0] == text[-1] == '"':
@@ -27,7 +49,7 @@ def sanitize_output(text: str) -> str:
     return text.strip()
 
 
-class Polisher:
+class MlxPolisher:
     def __init__(self, model_name: str):
         from mlx_lm import load
 
@@ -36,21 +58,46 @@ class Polisher:
     def polish(self, transcript: str, tone: str = "default") -> str:
         from mlx_lm import generate
 
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": build_prompt(
-                    "um so the meeting is at three no wait four pm", "default"
-                ),
-            },
-            {"role": "assistant", "content": "The meeting is at 4 pm."},
-            {"role": "user", "content": build_prompt(transcript, tone)},
-        ]
         prompt = self.tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
+            build_messages(transcript, tone), tokenize=False, add_generation_prompt=True
         )
         raw = generate(self.model, self.tokenizer, prompt=prompt, max_tokens=512)
         result = sanitize_output(raw)
         # a polish pass must never destroy the transcript
         return result if result else transcript
+
+
+class OllamaPolisher:
+    def __init__(self, model_name: str, url: str = "http://localhost:11434"):
+        self.model_name = model_name
+        self.url = url.rstrip("/")
+        self._chat("ping", "default")  # warm the model and fail fast if daemon is down
+
+    def _chat(self, transcript: str, tone: str) -> str:
+        body = json.dumps(
+            {
+                "model": self.model_name,
+                "stream": False,
+                "keep_alive": "30m",
+                "messages": build_messages(transcript, tone),
+            }
+        ).encode()
+        req = urllib.request.Request(
+            f"{self.url}/api/chat", data=body, headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.load(resp)["message"]["content"]
+
+    def polish(self, transcript: str, tone: str = "default") -> str:
+        result = sanitize_output(self._chat(transcript, tone))
+        return result if result else transcript
+
+
+# backwards-compatible name for the default backend
+Polisher = MlxPolisher
+
+
+def make_polisher(cfg):
+    if cfg.llm_backend == "ollama":
+        return OllamaPolisher(cfg.ollama_model, cfg.ollama_url)
+    return MlxPolisher(cfg.llm_model)

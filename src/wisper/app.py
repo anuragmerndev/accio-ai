@@ -38,9 +38,9 @@ class WisperApp(rumps.App):
         self.transcriber = Transcriber(self.cfg.asr_model)
         if self.cfg.llm_polish:
             try:
-                from wisper.polish import Polisher
+                from wisper.polish import make_polisher
 
-                self.polisher = Polisher(self.cfg.llm_model)
+                self.polisher = make_polisher(self.cfg)
             except Exception as e:
                 print(f"LLM polish unavailable ({e}); continuing with rules only")
                 self.menu["LLM polish"].state = False
