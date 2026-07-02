@@ -12,6 +12,28 @@ from wisper.pipeline import Pipeline
 IDLE, RECORDING, PROCESSING, LOADING = "🎤", "🔴", "⏳", "…"
 
 
+def ensure_input_monitoring() -> bool:
+    """The global hotkey listener needs Input Monitoring (separate from
+    Accessibility, which only covers the paste keystroke). Requesting it
+    registers this binary in System Settings → Privacy → Input Monitoring
+    so the user can enable it; the grant takes effect on the next launch."""
+    try:
+        from Quartz import CGPreflightListenEventAccess, CGRequestListenEventAccess
+
+        granted = CGPreflightListenEventAccess()
+        print(f"input monitoring granted={granted}")
+        if not granted:
+            CGRequestListenEventAccess()
+            print(
+                "Requested Input Monitoring. Enable Wisper in System Settings → "
+                "Privacy & Security → Input Monitoring, then restart."
+            )
+        return granted
+    except Exception as e:
+        print(f"input monitoring check failed: {e}")
+        return False
+
+
 class WisperApp(rumps.App):
     def __init__(self, cfg: Config):
         super().__init__("Wisper", title=LOADING, quit_button="Quit")
@@ -30,6 +52,7 @@ class WisperApp(rumps.App):
             on_result=self._on_text,
             on_done=self._on_utterance_done,
         )
+        ensure_input_monitoring()
         self.hotkey = PushToTalk(cfg.hotkey, self._on_press, self._on_release)
         self.hotkey.start()
 

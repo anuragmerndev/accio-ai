@@ -46,7 +46,10 @@ def _deploy() -> Path:
     project_dir = Path(__file__).resolve().parents[2]
     DEPLOY_DIR.mkdir(parents=True, exist_ok=True)
     print(f"Deploying a standalone copy to {DEPLOY_DIR} ...")
-    subprocess.run(["uv", "venv", str(DEPLOY_VENV), "--python", "3.12"], check=True)
+    # --clear makes redeploys idempotent (replace any existing venv)
+    subprocess.run(
+        ["uv", "venv", str(DEPLOY_VENV), "--python", "3.12", "--clear"], check=True
+    )
     subprocess.run(
         [
             "uv", "pip", "install",

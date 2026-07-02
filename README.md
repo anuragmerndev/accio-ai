@@ -44,9 +44,13 @@ Grant these to your terminal app (or whatever launches `wisper`) in
 **System Settings → Privacy & Security**:
 
 - **Microphone** — to record your speech
-- **Accessibility** — for the global hotkey listener and the ⌘V paste keystroke
+- **Input Monitoring** — to *receive* the global hotkey. The app requests this on
+  launch and registers itself in the list; just toggle it on.
+- **Accessibility** — to *send* the ⌘V paste keystroke.
 
-Restart `wisper` after granting.
+Input Monitoring and Accessibility are separate permissions: the first lets the
+app hear your hotkey, the second lets it paste. You need both. Restart `wisper`
+after granting.
 
 ## Usage
 
@@ -115,9 +119,9 @@ Because the repo lives under `~/Desktop` (a folder macOS shields from
 background agents), `install` deploys a self-contained copy — its own venv with
 the package and dependencies — to `~/Library/Application Support/wisper` and
 registers a LaunchAgent pointing there. Re-run `install` after code changes to
-redeploy. The deployed copy is a separate binary, so grant it **Accessibility**
-once (System Settings → Privacy & Security → Accessibility) for the hotkey to
-work; logs go to `~/.wisper/wisper.log`.
+redeploy. The deployed copy is a separate binary, so grant it **Input
+Monitoring** and **Accessibility** once (it registers itself in both panes on
+first launch); logs go to `~/.wisper/wisper.log`.
 
 ## Multilingual dictation
 
