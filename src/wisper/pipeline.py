@@ -55,6 +55,14 @@ class Pipeline:
                 polisher = make_polisher(self.cfg)
             except Exception as e:
                 print(f"LLM polish unavailable ({e}); continuing with rules only")
+        romanizer = None
+        if self.cfg.romanize_languages:
+            try:
+                from wisper.romanize import Romanizer
+
+                romanizer = Romanizer(self.cfg.romanize_model, self.cfg.ollama_url)
+            except Exception as e:
+                print(f"Romanization unavailable ({e}); non-Latin scripts paste as-is")
         self._ready.set()
         self.on_ready(polisher is not None)
 
@@ -62,6 +70,8 @@ class Pipeline:
             audio, tone = self._jobs.get()
             try:
                 text, language = transcriber.transcribe(audio)
+                if text and romanizer is not None and language in self.cfg.romanize_languages:
+                    text = romanizer.romanize(text)
                 text = clean(text, self.cfg.filler_words)
                 text = apply_dictionary(text, self.cfg.dictionary)
                 # the polish model is only trustworthy in configured languages;

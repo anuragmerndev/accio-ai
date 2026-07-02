@@ -65,6 +65,8 @@ asr_backend = "parakeet"     # "parakeet" (fast, English) or "whisper" (multilin
 asr_model = "mlx-community/parakeet-tdt-0.6b-v2"
 whisper_model = "mlx-community/whisper-large-v3-turbo"
 polish_languages = ["en"]    # LLM polish only runs for these; others get rules-only
+romanize_languages = []      # e.g. ["hi"] pastes Hindi as romanized Hinglish (via Ollama)
+romanize_model = "llama3.2"
 llm_model = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
 llm_polish = true
 llm_backend = "mlx"     # "mlx" (in-process, default) or "ollama" (local daemon)
@@ -107,6 +109,12 @@ per-utterance auto-detection — speak whichever language you like, no switching
 Whisper is ~2x slower than Parakeet on short utterances (~1.8 s vs ~0.9 s).
 Non-English utterances skip the LLM polish (rules-only cleanup) unless you add
 their codes to `polish_languages`.
+
+With `romanize_languages = ["hi"]`, Hindi output is converted from Devanagari
+to natural romanized Hinglish ("कल मीटिंग तीन बजे है" → "kal meeting teen baje
+hai") by a local LLM via Ollama — same words, Latin script, never translated.
+Requires the Ollama daemon with the `romanize_model` pulled; if unavailable,
+Devanagari pastes as-is.
 
 ## Not implemented (vs Wispr Flow)
 

@@ -16,6 +16,8 @@ class Config:
     asr_model: str = "mlx-community/parakeet-tdt-0.6b-v2"
     whisper_model: str = "mlx-community/whisper-large-v3-turbo"
     polish_languages: list[str] = field(default_factory=lambda: ["en"])
+    romanize_languages: list[str] = field(default_factory=list)  # e.g. ["hi"] → Hinglish
+    romanize_model: str = "llama3.2"
     llm_model: str = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
     llm_polish: bool = True
     llm_backend: str = "mlx"  # "mlx" or "ollama"

@@ -5,9 +5,6 @@ Two interchangeable backends, both fully local:
 - OllamaPolisher: local Ollama daemon over localhost HTTP
 """
 
-import json
-import urllib.request
-
 TONE_HINTS = {
     "chat": "Keep it casual and short, like a chat message.",
     "email": "Use a clear, professional tone suitable for email.",
@@ -76,27 +73,16 @@ class MlxPolisher:
 
 class OllamaPolisher:
     def __init__(self, model_name: str, url: str = "http://localhost:11434"):
-        self.model_name = model_name
-        self.url = url.rstrip("/")
-        self._chat("ping", "default")  # warm the model and fail fast if daemon is down
+        from wisper import ollama
 
-    def _chat(self, transcript: str, tone: str) -> str:
-        body = json.dumps(
-            {
-                "model": self.model_name,
-                "stream": False,
-                "keep_alive": "30m",
-                "messages": build_messages(transcript, tone),
-            }
-        ).encode()
-        req = urllib.request.Request(
-            f"{self.url}/api/chat", data=body, headers={"Content-Type": "application/json"}
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.load(resp)["message"]["content"]
+        self._chat = ollama.chat
+        self.model_name = model_name
+        self.url = url
+        self._chat(url, model_name, build_messages("ping", "default"))  # warm + fail fast
 
     def polish(self, transcript: str, tone: str = "default") -> str:
-        result = sanitize_output(self._chat(transcript, tone))
+        raw = self._chat(self.url, self.model_name, build_messages(transcript, tone))
+        result = sanitize_output(raw)
         return result if result else transcript
 
 
