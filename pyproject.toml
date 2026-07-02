@@ -1,0 +1,31 @@
+[project]
+name = "wisper"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "anuragmerndev", email = "anuragmerndeveloper@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "mlx-lm>=0.31.3",
+    "numpy>=2.4.6",
+    "parakeet-mlx>=0.5.2",
+    "pynput>=1.8.2",
+    "pyobjc-framework-cocoa>=12.2.1",
+    "pyobjc-framework-quartz>=12.2.1",
+    "rumps>=0.4.0",
+    "sounddevice>=0.5.5",
+]
+
+[project.scripts]
+wisper = "wisper:main"
+
+[build-system]
+requires = ["uv_build>=0.11.7,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
