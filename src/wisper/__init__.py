@@ -1,16 +1,16 @@
 import sys
 
+_COMMANDS = {"install", "uninstall", "start", "stop", "restart"}
+
 
 def main() -> None:
     args = sys.argv[1:]
-    if args and args[0] == "install":
-        from wisper.service import install
+    cmd = args[0] if args else None
+    if cmd in _COMMANDS:
+        import wisper.service as service
 
-        install()
-    elif args and args[0] == "uninstall":
-        from wisper.service import uninstall
-
-        uninstall()
+        # `restart` is just `start` (kickstart -k restarts if already running)
+        getattr(service, "start" if cmd == "restart" else cmd)()
     else:
         from wisper.app import main as run
 

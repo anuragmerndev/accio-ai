@@ -113,7 +113,14 @@ Design doc: [docs/superpowers/specs/2026-07-02-local-wispr-clone-design.md](docs
 ```sh
 uv run wisper install     # start automatically at every login
 uv run wisper uninstall   # stop doing so
+uv run wisper start        # (re)start now, no logout needed
+uv run wisper stop         # stop until next login / start
 ```
+
+`install` also creates **Accio.app** in `~/Applications` — a Spotlight-searchable
+launcher (the Summoning Charm). Search "Accio" and hit Enter to start or restart
+Wisper on demand, just like any other app. It's a thin wrapper that kickstarts
+the background agent, so your granted permissions carry over.
 
 Because the repo lives under `~/Desktop` (a folder macOS shields from
 background agents), `install` deploys a self-contained copy — its own venv with
