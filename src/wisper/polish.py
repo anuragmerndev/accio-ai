@@ -28,18 +28,25 @@ def build_prompt(transcript: str, tone: str) -> str:
     return f"{hint}\n\nDictated speech:\n{transcript}"
 
 
+# few-shot pairs teaching the correction patterns small models get wrong:
+# "no wait Y", "no not X, Y", and bare "no Y" replacements
+FEW_SHOTS = [
+    ("um so the meeting is at three no wait four pm", "The meeting is at 4 pm."),
+    (
+        "Let's do the launch on Tuesday. No, not Tuesday. On Thursday.",
+        "Let's do the launch on Thursday.",
+    ),
+    ("Make the header green, no orange.", "Make the header orange."),
+]
+
+
 def build_messages(transcript: str, tone: str) -> list[dict[str, str]]:
-    return [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": build_prompt(
-                "um so the meeting is at three no wait four pm", "default"
-            ),
-        },
-        {"role": "assistant", "content": "The meeting is at 4 pm."},
-        {"role": "user", "content": build_prompt(transcript, tone)},
-    ]
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    for spoken, cleaned in FEW_SHOTS:
+        messages.append({"role": "user", "content": build_prompt(spoken, "default")})
+        messages.append({"role": "assistant", "content": cleaned})
+    messages.append({"role": "user", "content": build_prompt(transcript, tone)})
+    return messages
 
 
 def sanitize_output(text: str) -> str:

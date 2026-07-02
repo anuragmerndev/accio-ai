@@ -1,12 +1,12 @@
 from wisper.config import Config
-from wisper.polish import SYSTEM_PROMPT, build_messages
+from wisper.polish import FEW_SHOTS, SYSTEM_PROMPT, build_messages
 
 
 def test_messages_include_system_and_fewshot_and_transcript():
     msgs = build_messages("hello world", "chat")
     assert msgs[0] == {"role": "system", "content": SYSTEM_PROMPT}
     roles = [m["role"] for m in msgs]
-    assert roles == ["system", "user", "assistant", "user"]
+    assert roles == ["system"] + ["user", "assistant"] * len(FEW_SHOTS) + ["user"]
     assert "hello world" in msgs[-1]["content"]
 
 
