@@ -61,7 +61,10 @@ Optional files in `~/.wisper/`:
 
 `config.toml`
 ```toml
+asr_backend = "parakeet"     # "parakeet" (fast, English) or "whisper" (multilingual)
 asr_model = "mlx-community/parakeet-tdt-0.6b-v2"
+whisper_model = "mlx-community/whisper-large-v3-turbo"
+polish_languages = ["en"]    # LLM polish only runs for these; others get rules-only
 llm_model = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
 llm_polish = true
 llm_backend = "mlx"     # "mlx" (in-process, default) or "ollama" (local daemon)
@@ -88,7 +91,7 @@ Design doc: [docs/superpowers/specs/2026-07-02-local-wispr-clone-design.md](docs
 | Module | Responsibility |
 |---|---|
 | `audio.py` | mic capture via sounddevice |
-| `asr.py` | Parakeet MLX transcription (in-memory, no ffmpeg) |
+| `asr.py` | Parakeet (English) or Whisper (multilingual) MLX transcription |
 | `cleanup.py` | deterministic filler/whitespace rules |
 | `dictionary.py` | personal term replacements |
 | `polish.py` | optional local-LLM rewrite with tone hint (mlx-lm or Ollama backend) |
@@ -97,8 +100,15 @@ Design doc: [docs/superpowers/specs/2026-07-02-local-wispr-clone-design.md](docs
 | `paste.py` | clipboard-swap ⌘V insertion |
 | `app.py` | rumps menu bar + pipeline orchestration |
 
+## Multilingual dictation
+
+Set `asr_backend = "whisper"` for 100+ languages (incl. Hindi/Hinglish) with
+per-utterance auto-detection — speak whichever language you like, no switching.
+Whisper is ~2x slower than Parakeet on short utterances (~1.8 s vs ~0.9 s).
+Non-English utterances skip the LLM polish (rules-only cleanup) unless you add
+their codes to `polish_languages`.
+
 ## Not implemented (vs Wispr Flow)
 
 Command mode (voice-editing selected text), text context around the cursor,
-screen OCR, streaming preview, multi-language auto-detect (swap in a
-multilingual model via `asr_model`), Windows/Linux.
+screen OCR, streaming preview, Windows/Linux.

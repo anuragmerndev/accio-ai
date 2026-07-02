@@ -44,9 +44,9 @@ class Pipeline:
         self._jobs.put((audio, tone))
 
     def _worker(self) -> None:
-        from wisper.asr import Transcriber
+        from wisper.asr import make_transcriber
 
-        transcriber = Transcriber(self.cfg.asr_model)
+        transcriber = make_transcriber(self.cfg)
         polisher = None
         if self.cfg.llm_polish:
             try:
@@ -61,10 +61,17 @@ class Pipeline:
         while True:
             audio, tone = self._jobs.get()
             try:
-                text = transcriber.transcribe(audio)
+                text, language = transcriber.transcribe(audio)
                 text = clean(text, self.cfg.filler_words)
                 text = apply_dictionary(text, self.cfg.dictionary)
-                if text and polisher is not None and self.polish_enabled:
+                # the polish model is only trustworthy in configured languages;
+                # other languages get rules-only cleanup
+                if (
+                    text
+                    and polisher is not None
+                    and self.polish_enabled
+                    and language in self.cfg.polish_languages
+                ):
                     text = polisher.polish(text, tone)
                 if text:
                     self.on_result(text)
