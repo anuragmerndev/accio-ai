@@ -1,2 +1,4 @@
 def main() -> None:
-    print("Hello from wisper!")
+    from wisper.app import main as run
+
+    run()
