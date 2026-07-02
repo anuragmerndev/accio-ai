@@ -7,6 +7,8 @@ dictionary never leave your machine.
 
 ## How it works
 
+![Architecture](docs/wisper-architecture.drawio.png)
+
 ```
 hold Right Option → record mic (16 kHz)
 release           → Parakeet TDT 0.6B (MLX, Apple Silicon)   ~0.9 s
