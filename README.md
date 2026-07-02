@@ -104,6 +104,21 @@ Design doc: [docs/superpowers/specs/2026-07-02-local-wispr-clone-design.md](docs
 | `paste.py` | clipboard-swap ⌘V insertion |
 | `app.py` | rumps menu bar + pipeline orchestration |
 
+## Launch at login
+
+```sh
+uv run wisper install     # start automatically at every login
+uv run wisper uninstall   # stop doing so
+```
+
+Because the repo lives under `~/Desktop` (a folder macOS shields from
+background agents), `install` deploys a self-contained copy — its own venv with
+the package and dependencies — to `~/Library/Application Support/wisper` and
+registers a LaunchAgent pointing there. Re-run `install` after code changes to
+redeploy. The deployed copy is a separate binary, so grant it **Accessibility**
+once (System Settings → Privacy & Security → Accessibility) for the hotkey to
+work; logs go to `~/.wisper/wisper.log`.
+
 ## Multilingual dictation
 
 Set `asr_backend = "whisper"` for 100+ languages (incl. Hindi/Hinglish) with
