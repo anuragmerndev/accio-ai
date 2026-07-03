@@ -8,6 +8,7 @@ def test_defaults_when_no_file(tmp_path: Path):
     assert cfg.asr_model == "mlx-community/parakeet-tdt-0.6b-v2"
     assert cfg.llm_polish is True
     assert cfg.min_utterance_seconds == 0.3
+    assert cfg.min_peak_amplitude == 0.02
     assert "um" in cfg.filler_words
 
 

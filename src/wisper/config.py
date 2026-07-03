@@ -25,6 +25,9 @@ class Config:
     ollama_url: str = "http://localhost:11434"
     hotkey: str = "alt_r"
     min_utterance_seconds: float = 0.3
+    # skip audio too quiet to be speech — stops Whisper's "Thank you" silence
+    # hallucination from being pasted (peak amplitude, 0..1)
+    min_peak_amplitude: float = 0.02
     filler_words: list[str] = field(default_factory=lambda: list(DEFAULT_FILLERS))
     dictionary: dict[str, str] = field(default_factory=dict)
 

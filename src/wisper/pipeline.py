@@ -69,6 +69,14 @@ class Pipeline:
         while True:
             audio, tone = self._jobs.get()
             try:
+                import numpy as np
+
+                peak = float(np.abs(audio).max()) if len(audio) else 0.0
+                if peak < self.cfg.min_peak_amplitude:
+                    # too quiet to be speech: skip so Whisper's silence
+                    # hallucination ("Thank you.") never reaches the cursor
+                    print(f"skipped: no speech (peak={peak:.4f})")
+                    continue
                 text, language = transcriber.transcribe(audio)
                 if text and romanizer is not None and language in self.cfg.romanize_languages:
                     text = romanizer.romanize(text)
