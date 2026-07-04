@@ -1,6 +1,6 @@
 import plistlib
 
-from wisper.service import LABEL, build_info_plist, launcher_script
+from accio.service import LABEL, build_info_plist, launcher_script
 
 
 def test_info_plist_identifies_app():

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from wisper.config import Config, load_config
+from accio.config import Config, load_config
 
 
 def test_defaults_when_no_file(tmp_path: Path):
@@ -23,9 +23,9 @@ def test_file_overrides_defaults(tmp_path: Path):
 
 
 def test_dictionary_loads_from_json(tmp_path: Path):
-    (tmp_path / "dictionary.json").write_text('{"wisper": "Wisper"}')
+    (tmp_path / "dictionary.json").write_text('{"accio": "Accio"}')
     cfg = load_config(tmp_path / "config.toml")
-    assert cfg.dictionary == {"wisper": "Wisper"}
+    assert cfg.dictionary == {"accio": "Accio"}
 
 
 def test_missing_dictionary_is_empty(tmp_path: Path):

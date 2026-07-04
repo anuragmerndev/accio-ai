@@ -1,5 +1,5 @@
 [project]
-name = "wisper"
+name = "accio"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-wisper = "wisper:main"
+accio = "accio:main"
 
 [build-system]
 requires = ["uv_build>=0.11.7,<0.12.0"]

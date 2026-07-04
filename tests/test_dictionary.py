@@ -1,7 +1,7 @@
-from wisper.dictionary import apply_dictionary
+from accio.dictionary import apply_dictionary
 
 
-TERMS = {"anurag": "Anurag", "wisper": "Wisper", "java script": "JavaScript"}
+TERMS = {"anurag": "Anurag", "accio": "Accio", "java script": "JavaScript"}
 
 
 def test_replaces_known_term():
@@ -17,8 +17,8 @@ def test_multiword_term():
 
 
 def test_word_boundaries_respected():
-    # "wisper" inside "whisperer"-like word must not match
-    assert apply_dictionary("the wispering wind", TERMS) == "the wispering wind"
+    # "accio" inside "whisperer"-like word must not match
+    assert apply_dictionary("the accioing wind", TERMS) == "the accioing wind"
 
 
 def test_empty_terms_is_noop():
@@ -26,4 +26,4 @@ def test_empty_terms_is_noop():
 
 
 def test_multiple_occurrences():
-    assert apply_dictionary("wisper is wisper", TERMS) == "Wisper is Wisper"
+    assert apply_dictionary("accio is accio", TERMS) == "Accio is Accio"

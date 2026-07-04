@@ -9,8 +9,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from wisper.config import Config
-from wisper.pipeline import Pipeline
+from accio.config import Config
+from accio.pipeline import Pipeline
 
 
 @pytest.mark.slow

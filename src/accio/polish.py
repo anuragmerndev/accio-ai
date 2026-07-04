@@ -73,7 +73,7 @@ class MlxPolisher:
 
 class OllamaPolisher:
     def __init__(self, model_name: str, url: str = "http://localhost:11434"):
-        from wisper import ollama
+        from accio import ollama
 
         self._chat = ollama.chat
         self.model_name = model_name

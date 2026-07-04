@@ -5,8 +5,8 @@ and Qwen 1.5B swaps words; llama3.2 via Ollama produces natural Hinglish.
 On any failure the original Devanagari text is returned unchanged.
 """
 
-from wisper import ollama
-from wisper.polish import sanitize_output
+from accio import ollama
+from accio.polish import sanitize_output
 
 SYSTEM_PROMPT = (
     "You convert Hindi text from Devanagari to natural romanized Hinglish, the way "

@@ -1,5 +1,5 @@
-from wisper.config import Config
-from wisper.polish import FEW_SHOTS, SYSTEM_PROMPT, build_messages
+from accio.config import Config
+from accio.polish import FEW_SHOTS, SYSTEM_PROMPT, build_messages
 
 
 def test_messages_include_system_and_fewshot_and_transcript():

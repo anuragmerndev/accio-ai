@@ -1,13 +1,13 @@
-"""Config loading: ~/.wisper/config.toml merged over defaults, plus dictionary.json."""
+"""Config loading: ~/.accio/config.toml merged over defaults, plus dictionary.json."""
 
 import json
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from wisper.cleanup import DEFAULT_FILLERS
+from accio.cleanup import DEFAULT_FILLERS
 
-CONFIG_DIR = Path.home() / ".wisper"
+CONFIG_DIR = Path.home() / ".accio"
 
 
 @dataclass

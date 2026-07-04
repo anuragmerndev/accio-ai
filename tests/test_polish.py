@@ -1,4 +1,4 @@
-from wisper.polish import TONE_HINTS, build_prompt, sanitize_output
+from accio.polish import TONE_HINTS, build_prompt, sanitize_output
 
 
 def test_prompt_contains_transcript_and_tone():

@@ -2,24 +2,24 @@
 
 The dev repo lives under ~/Desktop, a TCC-protected folder that background
 launchd agents cannot read — the venv Python there wedges during interpreter
-startup. So `wisper install` deploys a self-contained copy (its own venv, with
+startup. So `accio install` deploys a self-contained copy (its own venv, with
 the package and dependencies installed non-editable) under Application Support,
 outside any protected folder, and points the launch agent at that copy.
 
-Re-run `wisper install` after code changes to redeploy the snapshot.
+Re-run `accio install` after code changes to redeploy the snapshot.
 """
 
 import plistlib
 import subprocess
 from pathlib import Path
 
-LABEL = "com.anuragmerndev.wisper"
+LABEL = "com.anuragmerndev.accio"
 PLIST_PATH = Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
-LOG_PATH = Path.home() / ".wisper" / "wisper.log"
-DEPLOY_DIR = Path.home() / "Library" / "Application Support" / "wisper"
+LOG_PATH = Path.home() / ".accio" / "accio.log"
+DEPLOY_DIR = Path.home() / "Library" / "Application Support" / "accio"
 DEPLOY_VENV = DEPLOY_DIR / "venv"
 # user-facing Spotlight app; "Accio" — the Summoning Charm. Internal LABEL and
-# the `wisper` CLI stay unchanged.
+# the `accio` CLI stay unchanged.
 APP_NAME = "Accio"
 APP_PATH = Path.home() / "Applications" / f"{APP_NAME}.app"
 
@@ -71,7 +71,7 @@ def launcher_script() -> str:
 
 
 def build_app_bundle() -> None:
-    """Write ~/Applications/Wisper.app — a Spotlight-searchable launcher."""
+    """Write ~/Applications/Accio.app — a Spotlight-searchable launcher."""
     macos = APP_PATH / "Contents" / "MacOS"
     macos.mkdir(parents=True, exist_ok=True)
     (APP_PATH / "Contents" / "Info.plist").write_bytes(build_info_plist())
@@ -98,7 +98,7 @@ def _deploy() -> Path:
         ],
         check=True,
     )
-    return DEPLOY_VENV / "bin" / "wisper"
+    return DEPLOY_VENV / "bin" / "accio"
 
 
 def install() -> None:
@@ -111,7 +111,7 @@ def install() -> None:
     subprocess.run(["launchctl", "bootout", f"gui/{_uid()}/{LABEL}"], capture_output=True)
     subprocess.run(["launchctl", "bootstrap", f"gui/{_uid()}", str(PLIST_PATH)], check=True)
     print(f"Installed launch agent at {PLIST_PATH}")
-    print("Wisper will now start automatically at login.")
+    print("Accio will now start automatically at login.")
 
 
 def uninstall() -> None:
@@ -122,18 +122,18 @@ def uninstall() -> None:
         import shutil
 
         shutil.rmtree(APP_PATH)
-    print("Removed the launch agent and Wisper.app. It will no longer start at login.")
+    print("Removed the launch agent and Accio.app. It will no longer start at login.")
     print(f"(The deployed copy at {DEPLOY_DIR} was left in place; delete it to fully remove.)")
 
 
 def start() -> None:
     subprocess.run(["launchctl", "kickstart", "-k", f"gui/{_uid()}/{LABEL}"], check=True)
-    print("Wisper (re)started.")
+    print("Accio (re)started.")
 
 
 def stop() -> None:
     subprocess.run(["launchctl", "bootout", f"gui/{_uid()}/{LABEL}"], capture_output=True)
-    print("Wisper stopped (until next login, or `wisper start`).")
+    print("Accio stopped (until next login, or `accio start`).")
 
 
 def _uid() -> int:

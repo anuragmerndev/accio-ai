@@ -1,10 +1,10 @@
 import plistlib
 
-from wisper.service import LABEL, build_plist
+from accio.service import LABEL, build_plist
 
 
-DEPLOY_BIN = "/Users/me/Library/Application Support/wisper/venv/bin/wisper"
-DEPLOY_DIR = "/Users/me/Library/Application Support/wisper"
+DEPLOY_BIN = "/Users/me/Library/Application Support/accio/venv/bin/accio"
+DEPLOY_DIR = "/Users/me/Library/Application Support/accio"
 
 
 def test_plist_has_label_and_program():
@@ -25,10 +25,10 @@ def test_plist_unbuffered_and_has_path():
     assert "/opt/homebrew/bin" in data["EnvironmentVariables"]["PATH"]
 
 
-def test_plist_logs_under_wisper_dir():
+def test_plist_logs_under_accio_dir():
     data = plistlib.loads(build_plist(DEPLOY_BIN, DEPLOY_DIR))
-    assert data["StandardOutPath"].endswith("/.wisper/wisper.log")
-    assert data["StandardErrorPath"].endswith("/.wisper/wisper.log")
+    assert data["StandardOutPath"].endswith("/.accio/accio.log")
+    assert data["StandardErrorPath"].endswith("/.accio/accio.log")
 
 
 def test_plist_is_valid_bytes():

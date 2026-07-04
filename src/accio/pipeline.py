@@ -11,9 +11,9 @@ from collections.abc import Callable
 
 import numpy as np
 
-from wisper.cleanup import clean
-from wisper.config import Config
-from wisper.dictionary import apply_dictionary
+from accio.cleanup import clean
+from accio.config import Config
+from accio.dictionary import apply_dictionary
 
 
 class Pipeline:
@@ -44,13 +44,13 @@ class Pipeline:
         self._jobs.put((audio, tone))
 
     def _worker(self) -> None:
-        from wisper.asr import make_transcriber
+        from accio.asr import make_transcriber
 
         transcriber = make_transcriber(self.cfg)
         polisher = None
         if self.cfg.llm_polish:
             try:
-                from wisper.polish import make_polisher
+                from accio.polish import make_polisher
 
                 polisher = make_polisher(self.cfg)
             except Exception as e:
@@ -58,7 +58,7 @@ class Pipeline:
         romanizer = None
         if self.cfg.romanize_languages:
             try:
-                from wisper.romanize import Romanizer
+                from accio.romanize import Romanizer
 
                 romanizer = Romanizer(self.cfg.romanize_model, self.cfg.ollama_url)
             except Exception as e:

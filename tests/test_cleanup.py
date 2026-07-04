@@ -1,4 +1,4 @@
-from wisper.cleanup import clean
+from accio.cleanup import clean
 
 
 def test_removes_filler_words():

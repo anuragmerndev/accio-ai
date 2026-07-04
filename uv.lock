@@ -7,6 +7,43 @@ resolution-markers = [
 ]
 
 [[package]]
+name = "accio"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "mlx-lm" },
+    { name = "mlx-whisper" },
+    { name = "numpy" },
+    { name = "parakeet-mlx" },
+    { name = "pynput" },
+    { name = "pyobjc-framework-cocoa" },
+    { name = "pyobjc-framework-quartz" },
+    { name = "rumps" },
+    { name = "sounddevice" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "mlx-lm", specifier = ">=0.31.3" },
+    { name = "mlx-whisper", specifier = ">=0.4.3" },
+    { name = "numpy", specifier = ">=2.4.6" },
+    { name = "parakeet-mlx", specifier = ">=0.5.2" },
+    { name = "pynput", specifier = ">=1.8.2" },
+    { name = "pyobjc-framework-cocoa", specifier = ">=12.2.1" },
+    { name = "pyobjc-framework-quartz", specifier = ">=12.2.1" },
+    { name = "rumps", specifier = ">=0.4.0" },
+    { name = "sounddevice", specifier = ">=0.5.5" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=9.1.1" }]
+
+[[package]]
 name = "annotated-doc"
 version = "0.0.4"
 source = { registry = "https://pypi.org/simple" }
@@ -536,6 +573,7 @@ wheels = [
 name = "llvmlite"
 version = "0.48.0"
 source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/dc/a0/acc8ffcd5bdc63df0097e22c719bfcd61b604358343089313a8aebbb24ab/llvmlite-0.48.0.tar.gz", hash = "sha256:543b19f9ef8f3c7c60d1468191e4ee1b1537bf9f8a3d56f64c0ddd98de92edd2", size = 184016, upload-time = "2026-07-02T20:20:05.308Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/92/a2/28696a9e61e245d1a79816d29d106692a90a2b6e7d78c98b326db70827af/llvmlite-0.48.0-cp312-cp312-macosx_12_0_arm64.whl", hash = "sha256:d66c3beb4209087ddd4cf4ed2a0856b6887e6a913bdcf1aacfec9851cf2cba4e", size = 40480651, upload-time = "2026-07-01T18:41:35.694Z" },
     { url = "https://files.pythonhosted.org/packages/80/f2/72409351db66d0a317ec5087e076f31fb7b773a640db8a90ce6b5cac9edd/llvmlite-0.48.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:416fa4c2c66c2c6dc6d0a402648c19206e548efa0aa1eff01ad5cdad0af8217d", size = 59890118, upload-time = "2026-07-01T18:41:44.886Z" },
@@ -1933,40 +1971,3 @@ sdist = { url = "https://files.pythonhosted.org/packages/53/0c/06f8b233b8fd13b9e
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7f/3e/5db95bcf282c52709639744ca2a8b149baccf648e39c8cc87553df9eae0c/urllib3-2.7.0-py3-none-any.whl", hash = "sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897", size = 131087, upload-time = "2026-05-07T16:13:17.151Z" },
 ]
-
-[[package]]
-name = "wisper"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "mlx-lm" },
-    { name = "mlx-whisper" },
-    { name = "numpy" },
-    { name = "parakeet-mlx" },
-    { name = "pynput" },
-    { name = "pyobjc-framework-cocoa" },
-    { name = "pyobjc-framework-quartz" },
-    { name = "rumps" },
-    { name = "sounddevice" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "mlx-lm", specifier = ">=0.31.3" },
-    { name = "mlx-whisper", specifier = ">=0.4.3" },
-    { name = "numpy", specifier = ">=2.4.6" },
-    { name = "parakeet-mlx", specifier = ">=0.5.2" },
-    { name = "pynput", specifier = ">=1.8.2" },
-    { name = "pyobjc-framework-cocoa", specifier = ">=12.2.1" },
-    { name = "pyobjc-framework-quartz", specifier = ">=12.2.1" },
-    { name = "rumps", specifier = ">=0.4.0" },
-    { name = "sounddevice", specifier = ">=0.5.5" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9.1.1" }]

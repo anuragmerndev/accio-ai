@@ -1,4 +1,4 @@
-# Wisper — Local, Private Wispr Flow Clone (Design)
+# Accio — Local, Private Wispr Flow Clone (Design)
 
 Date: 2026-07-02
 Status: Approved for implementation (autonomous /goal session; decisions flagged to user)
@@ -37,7 +37,7 @@ Parakeet for ASR + small local LLM for polish.
 | Insertion | NSPasteboard save → set → CGEvent Cmd+V → restore | Exactly what Wispr does; most compatible; keystroke-per-char injection is slow and trips security tools |
 | UI | `rumps` menu-bar app | Minimal; shows idle/recording/processing state; quit/toggle |
 | Mode | Batch-per-utterance | Wispr's own choice; enables rewrite stage |
-| Config | `~/.wisper/config.toml` + `~/.wisper/dictionary.json` | Survives repo moves; simple formats |
+| Config | `~/.accio/config.toml` + `~/.accio/dictionary.json` | Survives repo moves; simple formats |
 
 ## Architecture
 
@@ -110,7 +110,7 @@ app.py (rumps menu bar) owns threads and state: IDLE → RECORDING → PROCESSIN
 Command mode (voice-edit selected text), AX-tree text context around cursor,
 screen OCR, streaming preview, multi-language auto-detect (Parakeet v2 is
 English-first; model swap is a config change), Windows/Linux, packaging as .app
-bundle (runs via `uv run wisper`).
+bundle (runs via `uv run accio`).
 
 ## Privacy property
 

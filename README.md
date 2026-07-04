@@ -1,4 +1,4 @@
-# Wisper
+# Accio
 
 A private, fully-local [Wispr Flow](https://wisprflow.ai) clone for macOS.
 Hold a key, speak, release — cleaned-up text is pasted into whatever app has
@@ -7,7 +7,7 @@ dictionary never leave your machine.
 
 ## How it works
 
-![Architecture](docs/wisper-architecture.drawio.png)
+![Architecture](docs/accio-architecture.drawio.png)
 
 ```
 hold Right Option → record mic (16 kHz)
@@ -32,7 +32,7 @@ Requires Apple Silicon, macOS 14+, and [uv](https://docs.astral.sh/uv/).
 
 ```sh
 uv sync
-uv run wisper
+uv run accio
 ```
 
 First run downloads the two models from Hugging Face (~1.5 GB total) into the
@@ -40,7 +40,7 @@ standard HF cache; after that it is fully offline.
 
 ### Permissions (one-time)
 
-Grant these to your terminal app (or whatever launches `wisper`) in
+Grant these to your terminal app (or whatever launches `accio`) in
 **System Settings → Privacy & Security**:
 
 - **Microphone** — to record your speech
@@ -49,7 +49,7 @@ Grant these to your terminal app (or whatever launches `wisper`) in
 - **Accessibility** — to *send* the ⌘V paste keystroke.
 
 Input Monitoring and Accessibility are separate permissions: the first lets the
-app hear your hotkey, the second lets it paste. You need both. Restart `wisper`
+app hear your hotkey, the second lets it paste. You need both. Restart `accio`
 after granting.
 
 ## Usage
@@ -63,7 +63,7 @@ after granting.
 
 ## Configuration
 
-Optional files in `~/.wisper/`:
+Optional files in `~/.accio/`:
 
 `config.toml`
 ```toml
@@ -85,7 +85,7 @@ filler_words = ["um", "uh", "erm", "you know", "i mean"]
 
 `dictionary.json` — spoken form → written form, applied case-insensitively:
 ```json
-{ "anurag": "Anurag", "wisper": "Wisper", "java script": "JavaScript" }
+{ "anurag": "Anurag", "accio": "Accio", "java script": "JavaScript" }
 ```
 
 ## Development
@@ -111,24 +111,24 @@ Design doc: [docs/superpowers/specs/2026-07-02-local-wispr-clone-design.md](docs
 ## Launch at login
 
 ```sh
-uv run wisper install     # start automatically at every login
-uv run wisper uninstall   # stop doing so
-uv run wisper start        # (re)start now, no logout needed
-uv run wisper stop         # stop until next login / start
+uv run accio install     # start automatically at every login
+uv run accio uninstall   # stop doing so
+uv run accio start        # (re)start now, no logout needed
+uv run accio stop         # stop until next login / start
 ```
 
 `install` also creates **Accio.app** in `~/Applications` — a Spotlight-searchable
 launcher (the Summoning Charm). Search "Accio" and hit Enter to start or restart
-Wisper on demand, just like any other app. It's a thin wrapper that kickstarts
+Accio on demand, just like any other app. It's a thin wrapper that kickstarts
 the background agent, so your granted permissions carry over.
 
 Because the repo lives under `~/Desktop` (a folder macOS shields from
 background agents), `install` deploys a self-contained copy — its own venv with
-the package and dependencies — to `~/Library/Application Support/wisper` and
+the package and dependencies — to `~/Library/Application Support/accio` and
 registers a LaunchAgent pointing there. Re-run `install` after code changes to
 redeploy. The deployed copy is a separate binary, so grant it **Input
 Monitoring** and **Accessibility** once (it registers itself in both panes on
-first launch); logs go to `~/.wisper/wisper.log`.
+first launch); logs go to `~/.accio/accio.log`.
 
 ## Multilingual dictation
 
@@ -162,7 +162,7 @@ Built on the open-source ecosystem that makes local speech possible:
 
 ## Disclaimer
 
-Wisper is an independent, from-scratch reimplementation for personal use. It is
+Accio is an independent, from-scratch reimplementation for personal use. It is
 **not affiliated with, endorsed by, or derived from Wispr Flow or Wispr AI** —
 "Wispr Flow" is referenced only to describe the interaction model this project
 reproduces locally.

@@ -1,4 +1,4 @@
-from wisper.romanize import FEW_SHOTS, SYSTEM_PROMPT, build_messages
+from accio.romanize import FEW_SHOTS, SYSTEM_PROMPT, build_messages
 
 
 def test_messages_structure():

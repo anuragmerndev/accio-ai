@@ -2,12 +2,12 @@
 
 import rumps
 
-from wisper.audio import Recorder
-from wisper.config import Config, load_config
-from wisper.context import frontmost_app_name, tone_for_app
-from wisper.hotkey import PushToTalk
-from wisper.paste import copy_only, paste_text
-from wisper.pipeline import Pipeline
+from accio.audio import Recorder
+from accio.config import Config, load_config
+from accio.context import frontmost_app_name, tone_for_app
+from accio.hotkey import PushToTalk
+from accio.paste import copy_only, paste_text
+from accio.pipeline import Pipeline
 
 IDLE, RECORDING, PROCESSING, LOADING = "🎤", "🔴", "⏳", "…"
 
@@ -25,7 +25,7 @@ def ensure_input_monitoring() -> bool:
         if not granted:
             CGRequestListenEventAccess()
             print(
-                "Requested Input Monitoring. Enable Wisper in System Settings → "
+                "Requested Input Monitoring. Enable Accio in System Settings → "
                 "Privacy & Security → Input Monitoring, then restart."
             )
         return granted
@@ -34,9 +34,9 @@ def ensure_input_monitoring() -> bool:
         return False
 
 
-class WisperApp(rumps.App):
+class AccioApp(rumps.App):
     def __init__(self, cfg: Config):
-        super().__init__("Wisper", title=LOADING, quit_button="Quit")
+        super().__init__("Accio", title=LOADING, quit_button="Quit")
         self.cfg = cfg
         self.recorder = Recorder()
         self.enabled = True
@@ -100,4 +100,4 @@ class WisperApp(rumps.App):
 
 def main() -> None:
     cfg = load_config()
-    WisperApp(cfg).run()
+    AccioApp(cfg).run()
