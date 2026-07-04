@@ -8,7 +8,10 @@ Two interchangeable backends, both fully local:
 TONE_HINTS = {
     "chat": "Keep it casual and short, like a chat message.",
     "email": "Use a clear, professional tone suitable for email.",
-    "code": "Preserve technical terms, identifiers, and symbols exactly as spoken.",
+    "code": (
+        "Preserve technical terms, identifiers, and symbols exactly. Still "
+        "remove fillers and apply self-corrections like in any other text."
+    ),
     "default": "Use a natural, neutral tone.",
 }
 

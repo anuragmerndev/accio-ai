@@ -16,6 +16,27 @@ from accio.config import Config
 from accio.dictionary import apply_dictionary
 
 
+def _devanagari_ratio(text: str) -> float:
+    letters = [c for c in text if c.isalpha()]
+    if not letters:
+        return 0.0
+    return sum("ऀ" <= c <= "ॿ" for c in letters) / len(letters)
+
+
+def needs_romanization(text: str, language: str, romanize_languages: list[str]) -> bool:
+    """Romanize only when Devanagari is actually present — a flaky 'hi' tag on
+    Latin-script English must not send English text through the romanizer."""
+    return language in romanize_languages and _devanagari_ratio(text) > 0.2
+
+
+def should_polish(text: str, language: str, polish_languages: list[str]) -> bool:
+    """Polish when the tag says a supported language OR the text is
+    overwhelmingly Latin script (accents often mistag English speech)."""
+    if language in polish_languages:
+        return True
+    return _devanagari_ratio(text) == 0.0 and text.isascii()
+
+
 class Pipeline:
     def __init__(
         self,
@@ -78,19 +99,28 @@ class Pipeline:
                     print(f"skipped: no speech (peak={peak:.4f})")
                     continue
                 text, language = transcriber.transcribe(audio)
-                if text and romanizer is not None and language in self.cfg.romanize_languages:
+                # gate on the script actually present, not just Whisper's
+                # language tag — accents make the tag flaky (English speech
+                # tagged "hi" was skipping polish entirely)
+                romanized = text and romanizer is not None and needs_romanization(
+                    text, language, self.cfg.romanize_languages
+                )
+                if romanized:
                     text = romanizer.romanize(text)
                 text = clean(text, self.cfg.filler_words)
                 text = apply_dictionary(text, self.cfg.dictionary)
-                # the polish model is only trustworthy in configured languages;
-                # other languages get rules-only cleanup
-                if (
+                polished = (
                     text
                     and polisher is not None
                     and self.polish_enabled
-                    and language in self.cfg.polish_languages
-                ):
+                    and should_polish(text, language, self.cfg.polish_languages)
+                )
+                if polished:
                     text = polisher.polish(text, tone)
+                print(
+                    f"utterance: lang={language} tone={tone} peak={peak:.3f} "
+                    f"romanize={bool(romanized)} polish={bool(polished)}"
+                )
                 if text:
                     self.on_result(text)
             except Exception as e:
