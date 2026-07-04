@@ -1,9 +1,12 @@
 # Accio
 
-A private, fully-local [Wispr Flow](https://wisprflow.ai) clone for macOS.
-Hold a key, speak, release — cleaned-up text is pasted into whatever app has
-focus. **Zero network calls at runtime.** Audio, transcripts, and your personal
+**Accio** is a private, fully-local voice dictation app for macOS. Hold a key,
+speak, release — cleaned-up text is pasted into whatever app has focus.
+**Zero network calls at runtime.** Audio, transcripts, and your personal
 dictionary never leave your machine.
+
+It's an independent, on-device take on the [Wispr Flow](https://wisprflow.ai)
+experience (see the [disclaimer](#disclaimer)).
 
 ## How it works
 
@@ -144,7 +147,7 @@ hai") by a local LLM via Ollama — same words, Latin script, never translated.
 Requires the Ollama daemon with the `romanize_model` pulled; if unavailable,
 Devanagari pastes as-is.
 
-## Not implemented (vs Wispr Flow)
+## Not implemented
 
 Command mode (voice-editing selected text), text context around the cursor,
 screen OCR, streaming preview, Windows/Linux.
