@@ -148,3 +148,25 @@ Devanagari pastes as-is.
 
 Command mode (voice-editing selected text), text context around the cursor,
 screen OCR, streaming preview, Windows/Linux.
+
+## Credits
+
+Built on the open-source ecosystem that makes local speech possible:
+[parakeet-mlx](https://github.com/senstella/parakeet-mlx) and
+[mlx-whisper](https://github.com/ml-explore/mlx-examples) for ASR,
+[mlx-lm](https://github.com/ml-explore/mlx-lm) and
+[Ollama](https://ollama.com) for the polish/romanize passes, and
+[rumps](https://github.com/jaredks/rumps) for the menu bar. Design inspired by
+[VoiceInk](https://github.com/Beingpax/VoiceInk) and
+[Handy](https://github.com/cjpais/handy).
+
+## Disclaimer
+
+Wisper is an independent, from-scratch reimplementation for personal use. It is
+**not affiliated with, endorsed by, or derived from Wispr Flow or Wispr AI** —
+"Wispr Flow" is referenced only to describe the interaction model this project
+reproduces locally.
+
+## License
+
+[MIT](LICENSE) © 2026 anuragmerndev
