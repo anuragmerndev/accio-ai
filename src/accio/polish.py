@@ -17,9 +17,11 @@ TONE_HINTS = {
 
 SYSTEM_PROMPT = (
     "You clean up dictated speech. Fix punctuation and capitalization, remove filler "
-    "words and false starts, and apply self-corrections (if the speaker corrects "
-    "themselves, keep only the correction). Do not add, summarize, or explain "
-    "anything. Reply with the cleaned text only."
+    "words and false starts, and apply self-corrections: when the speaker corrects "
+    "themselves, keep ONLY the final version and delete what it replaces. "
+    "Corrections often start with 'no', 'no wait', or 'actually' and may appear "
+    "as their own short sentence. Never keep both the old and the new value. "
+    "Do not add, summarize, or explain anything. Reply with the cleaned text only."
 )
 
 
@@ -35,6 +37,10 @@ FEW_SHOTS = [
     (
         "Let's do the launch on Tuesday. No, not Tuesday. On Thursday.",
         "Let's do the launch on Thursday.",
+    ),
+    (
+        "You have a call tomorrow, no on Friday.",
+        "You have a call on Friday.",
     ),
     ("Make the header green, no orange.", "Make the header orange."),
 ]
