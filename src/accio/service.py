@@ -83,20 +83,22 @@ def build_app_bundle() -> None:
 
 def _deploy() -> Path:
     """Install a standalone copy outside protected folders. Returns its binary."""
+    import os
+
     project_dir = Path(__file__).resolve().parents[2]
     DEPLOY_DIR.mkdir(parents=True, exist_ok=True)
     print(f"Deploying a standalone copy to {DEPLOY_DIR} ...")
-    # --clear makes redeploys idempotent (replace any existing venv)
+    # uv sync --frozen installs the EXACT versions from uv.lock — a fresh
+    # dependency resolution once shipped a transformers release that broke
+    # mlx-lm's tokenizer loading in the deployed copy only.
+    # UV_PROJECT_ENVIRONMENT points the sync at the deploy venv;
+    # --no-editable makes the copy self-contained (a snapshot, not a symlink
+    # back into the TCC-protected repo folder).
     subprocess.run(
-        ["uv", "venv", str(DEPLOY_VENV), "--python", "3.12", "--clear"], check=True
-    )
-    subprocess.run(
-        [
-            "uv", "pip", "install",
-            "--python", str(DEPLOY_VENV / "bin" / "python"),
-            str(project_dir),
-        ],
+        ["uv", "sync", "--frozen", "--no-dev", "--no-editable"],
         check=True,
+        cwd=project_dir,
+        env={**os.environ, "UV_PROJECT_ENVIRONMENT": str(DEPLOY_VENV)},
     )
     return DEPLOY_VENV / "bin" / "accio"
 
