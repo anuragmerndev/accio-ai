@@ -86,10 +86,28 @@ min_utterance_seconds = 0.3
 filler_words = ["um", "uh", "erm", "you know", "i mean"]
 ```
 
-`dictionary.json` — spoken form → written form, applied case-insensitively:
+### Personal dictionary — teach it your names and terms
+
+`~/.accio/dictionary.json` maps what the model *hears* → what you *want written*,
+as whole words, case-insensitively. This is how you fix proper nouns the ASR
+mangles. For example, Whisper hears the uncommon word "Accio" as "Akio" or
+"Aqio" — so map every mishearing to the right spelling:
+
 ```json
-{ "anurag": "Anurag", "accio": "Accio", "java script": "JavaScript" }
+{
+  "akio": "Accio",
+  "aqio": "Accio",
+  "aquio": "Accio",
+  "akkio": "Accio",
+  "anurag": "Anurag",
+  "java script": "JavaScript"
+}
 ```
+
+Build your library over time: whenever a name comes out wrong, add the wrong
+spelling on the left and the correct one on the right, then restart
+(`accio start` or relaunch Accio.app). Multi-word terms work too
+(`"java script": "JavaScript"`).
 
 ## Development
 
