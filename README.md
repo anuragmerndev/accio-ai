@@ -8,6 +8,33 @@ dictionary never leave your machine.
 It's an independent, on-device take on the [Wispr Flow](https://wisprflow.ai)
 experience (see the [disclaimer](#disclaimer)).
 
+<!-- TODO before launch: record a ~20s demo and drop the GIF here.
+     Money shot: dictate, then toggle Wi-Fi OFF and dictate again — still works. -->
+
+## Why Accio
+
+- **100% on-device.** Speech recognition *and* the LLM cleanup run on Apple
+  Silicon via MLX. No account, no API keys, no network calls — pull your Wi-Fi
+  and it still works.
+- **Cleans up as you talk.** Removes "ums", fixes punctuation, and applies
+  self-corrections — say *"meeting on Tuesday, no wait Wednesday"* and it types
+  *"meeting on Wednesday."*
+- **Speaks English + Hindi**, auto-detected per sentence. Hindi comes out as
+  romanized Hinglish (*"kal meeting teen baje hai"*), never Devanagari, never
+  translated.
+- **Works everywhere** — Slack, Mail, code editors, any text field. Tone adapts
+  to the app.
+- **Free & open source** (MIT). Unlimited words.
+
+|                         | Accio          | Wispr Flow                    |
+| ----------------------- | -------------- | ----------------------------- |
+| Where your audio goes   | Stays on Mac   | Uploaded to their cloud       |
+| Price                   | Free           | $15/mo after 2,000 words/week |
+| Works offline           | ✅ Yes         | ❌ No (cloud ASR)             |
+| Account required        | ❌ No          | ✅ Yes                        |
+| Hindi → Hinglish        | ✅ Yes         | Devanagari                    |
+| Source available        | ✅ MIT         | ❌ Closed                     |
+
 ## How it works
 
 ![Architecture](docs/accio-architecture.drawio.png)
