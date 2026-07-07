@@ -23,15 +23,32 @@ class PushToTalk:
         self._held = False
         self._listener: keyboard.Listener | None = None
 
+    # callbacks are wrapped: an exception escaping into pynput kills the
+    # listener thread silently, permanently deafening the hotkey
     def _on_press(self, key) -> None:
-        if key == self.key and not self._held:
-            self._held = True
-            self.on_start()
+        try:
+            if key == self.key and not self._held:
+                self._held = True
+                self.on_start()
+        except Exception as e:
+            print(f"hotkey press handler error: {e}")
 
     def _on_release(self, key) -> None:
-        if key == self.key and self._held:
-            self._held = False
-            self.on_stop()
+        try:
+            if key == self.key and self._held:
+                self._held = False
+                self.on_stop()
+        except Exception as e:
+            print(f"hotkey release handler error: {e}")
+
+    @property
+    def alive(self) -> bool:
+        return self._listener is not None and self._listener.is_alive()
+
+    def reset_held(self) -> None:
+        """Clear stuck held-state after a missed release event (macOS
+        occasionally drops the modifier flagsChanged event)."""
+        self._held = False
 
     def start(self) -> None:
         self._listener = keyboard.Listener(

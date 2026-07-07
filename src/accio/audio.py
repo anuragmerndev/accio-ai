@@ -33,11 +33,16 @@ class Recorder:
 
     def stop(self) -> np.ndarray:
         with self._lock:
-            if self._stream is None:
+            stream, self._stream = self._stream, None
+            if stream is None:
                 return np.zeros(0, dtype=np.float32)
-            self._stream.stop()
-            self._stream.close()
-            self._stream = None
+            try:
+                stream.stop()
+                stream.close()
+            except Exception as e:
+                # device vanished mid-recording (Bluetooth earbuds sleeping);
+                # keep whatever audio was captured rather than dying
+                print(f"recorder stop error (device change?): {e}")
             if not self._chunks:
                 return np.zeros(0, dtype=np.float32)
             return np.concatenate(self._chunks)

@@ -28,6 +28,9 @@ class Config:
     # skip audio too quiet to be speech — stops Whisper's "Thank you" silence
     # hallucination from being pasted (peak amplitude, 0..1)
     min_peak_amplitude: float = 0.02
+    # watchdog force-stops a recording after this long — recovers the stuck
+    # 🔴 state when macOS drops the hotkey's release event
+    max_recording_seconds: float = 120.0
     filler_words: list[str] = field(default_factory=lambda: list(DEFAULT_FILLERS))
     dictionary: dict[str, str] = field(default_factory=dict)
 
