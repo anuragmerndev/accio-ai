@@ -8,24 +8,38 @@ def test_callback_exception_does_not_propagate_to_listener():
     def boom():
         raise RuntimeError("kaboom")
 
+    key = next(iter(PushToTalk("alt_r", boom, boom).keys))
     ptt = PushToTalk("alt_r", on_start=boom, on_stop=boom)
-    ptt._on_press(ptt.key)  # must not raise
-    assert ptt._held is True
-    ptt._on_release(ptt.key)  # must not raise
-    assert ptt._held is False
+    ptt._on_press(key)  # must not raise
+    assert ptt._held_key is key
+    ptt._on_release(key)  # must not raise
+    assert ptt._held_key is None
 
 
 def test_reset_held_clears_stuck_state():
     events = []
     ptt = PushToTalk("alt_r", on_start=lambda: events.append("start"), on_stop=lambda: events.append("stop"))
-    ptt._on_press(ptt.key)
-    assert ptt._held is True
+    key = next(iter(ptt.keys))
+    ptt._on_press(key)
+    assert ptt._held_key is key
     # macOS dropped the release event; watchdog resets
     ptt.reset_held()
-    assert ptt._held is False
+    assert ptt._held_key is None
     # next press starts a fresh recording instead of being swallowed
-    ptt._on_press(ptt.key)
+    ptt._on_press(key)
     assert events == ["start", "start"]
+
+
+def test_multiple_keys_any_triggers():
+    events = []
+    ptt = PushToTalk("alt_r,shift_r", on_start=lambda: events.append("start"), on_stop=lambda: events.append("stop"))
+    from accio.hotkey import KEY_MAP
+    ptt._on_press(KEY_MAP["shift_r"])  # external keyboard's right shift
+    ptt._on_release(KEY_MAP["shift_r"])
+    # alt press while shift-hold released does not leak stop
+    ptt._on_press(KEY_MAP["alt_r"])
+    ptt._on_release(KEY_MAP["alt_r"])
+    assert events == ["start", "stop", "start", "stop"]
 
 
 def test_alive_reflects_listener_state():

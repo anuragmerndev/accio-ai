@@ -6,7 +6,8 @@ startup. So `accio install` deploys a self-contained copy (its own venv, with
 the package and dependencies installed non-editable) under Application Support,
 outside any protected folder, and points the launch agent at that copy.
 
-Re-run `accio install` after code changes to redeploy the snapshot.
+Re-run `accio install` after code changes to redeploy the snapshot; it
+overwrites the deployed package source so code-only edits actually land.
 """
 
 import plistlib
@@ -100,6 +101,16 @@ def _deploy() -> Path:
         cwd=project_dir,
         env={**os.environ, "UV_PROJECT_ENVIRONMENT": str(DEPLOY_VENV)},
     )
+    # uv sync won't reinstall the first-party accio package when its version is
+    # unchanged, so code-only edits never reach the deployed copy. Overwrite the
+    # installed package source directly — deterministic, unlike uv's build cache.
+    import shutil
+
+    src_pkg = project_dir / "src" / "accio"
+    (dst_pkg,) = DEPLOY_VENV.glob("lib/python*/site-packages/accio")
+    for py in src_pkg.glob("*.py"):
+        shutil.copy2(py, dst_pkg / py.name)
+    shutil.rmtree(dst_pkg / "__pycache__", ignore_errors=True)
     return DEPLOY_VENV / "bin" / "accio"
 
 
@@ -109,9 +120,15 @@ def install() -> None:
     PLIST_PATH.parent.mkdir(parents=True, exist_ok=True)
     PLIST_PATH.write_bytes(build_plist(str(executable), str(DEPLOY_DIR)))
     build_app_bundle()
-    # bootout is a no-op if not loaded; ignore its failure, then load fresh
+    # bootout is a no-op if not loaded; ignore its failure, then load fresh.
+    # bootout is async, so a KeepAlive relaunch can leave the agent still loaded
+    # when bootstrap runs (exit 5) — fall back to kickstart -k to restart it.
     subprocess.run(["launchctl", "bootout", f"gui/{_uid()}/{LABEL}"], capture_output=True)
-    subprocess.run(["launchctl", "bootstrap", f"gui/{_uid()}", str(PLIST_PATH)], check=True)
+    bootstrap = subprocess.run(
+        ["launchctl", "bootstrap", f"gui/{_uid()}", str(PLIST_PATH)], capture_output=True
+    )
+    if bootstrap.returncode != 0:
+        subprocess.run(["launchctl", "kickstart", "-k", f"gui/{_uid()}/{LABEL}"], check=True)
     print(f"Installed launch agent at {PLIST_PATH}")
     print("Accio will now start automatically at login.")
 
