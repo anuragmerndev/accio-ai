@@ -16,9 +16,9 @@ import rumps
 
 from accio.audio import Recorder
 from accio.config import Config, load_config
-from accio.context import frontmost_app_name, tone_for_app
+from accio.platform.darwin.context import frontmost_app_name, tone_for_app
 from accio.hotkey import PushToTalk
-from accio.paste import copy_only, paste_text
+from accio.platform.darwin.paste import copy_only, paste_text
 from accio.pipeline import Pipeline
 
 IDLE, RECORDING, PROCESSING, LOADING = "🎤", "🔴", "⏳", "…"

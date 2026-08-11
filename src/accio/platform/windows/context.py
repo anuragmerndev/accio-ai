@@ -11,6 +11,7 @@ from ctypes import wintypes
 APP_TONES = {
     "slack": "chat",
     "discord": "chat",
+    "messages": "chat",
     "whatsapp": "chat",
     "telegram": "chat",
     "teams": "chat",
@@ -26,11 +27,13 @@ APP_TONES = {
     "wezterm": "code",
     "alacritty": "code",
     "vscode": "code",
+    "iterm2": "code",
+    "xcode": "code",
+    "zed": "code",
     "notepad": "default",
     "word": "email",
     "onenote": "default",
     "obsidian": "default",
-    "zed": "code",
 }
 
 _user32 = ctypes.windll.user32
