@@ -21,25 +21,49 @@ _VK_V = 0x56
 
 # --- clipboard ---------------------------------------------------------------
 
+# Win32 handles (HGLOBAL, void*) need correct ctypes signatures. Letting
+# ctypes default to returning c_int truncates 64-bit pointers on Windows,
+# which produces non-zero alloc handles but null GlobalLock results.
+_kernel32 = ctypes.windll.kernel32
+_user32 = ctypes.windll.user32
+
+_kernel32.GlobalAlloc.restype = ctypes.c_void_p
+_kernel32.GlobalAlloc.argtypes = (wintypes.UINT, ctypes.c_size_t)
+_kernel32.GlobalLock.restype = ctypes.c_void_p
+_kernel32.GlobalLock.argtypes = (wintypes.HGLOBAL,)
+_kernel32.GlobalUnlock.argtypes = (wintypes.HGLOBAL,)
+_kernel32.GlobalFree.argtypes = (wintypes.HGLOBAL,)
+
+_user32.OpenClipboard.argtypes = (wintypes.HWND,)
+_user32.OpenClipboard.restype = wintypes.BOOL
+_user32.CloseClipboard.argtypes = ()
+_user32.CloseClipboard.restype = wintypes.BOOL
+_user32.EmptyClipboard.argtypes = ()
+_user32.EmptyClipboard.restype = wintypes.BOOL
+_user32.IsClipboardFormatAvailable.argtypes = (wintypes.UINT,)
+_user32.IsClipboardFormatAvailable.restype = wintypes.BOOL
+_user32.GetClipboardData.argtypes = (wintypes.UINT,)
+_user32.GetClipboardData.restype = wintypes.HANDLE
+_user32.SetClipboardData.argtypes = (wintypes.UINT, wintypes.HANDLE)
+_user32.SetClipboardData.restype = wintypes.HANDLE
+
+
 def _open_clipboard() -> None:
-    user32 = ctypes.windll.user32
     # retry briefly: another process may have the clipboard open
     for _ in range(20):
-        if user32.OpenClipboard(0):
+        if _user32.OpenClipboard(0):
             return
         time.sleep(0.05)
     raise OSError("OpenClipboard failed; another process holds the clipboard")
 
 
 def _get_clipboard_text() -> str | None:
-    user32 = ctypes.windll.user32
-    kernel32 = ctypes.windll.kernel32
-    if not user32.IsClipboardFormatAvailable(_CF_UNICODETEXT):
+    if not _user32.IsClipboardFormatAvailable(_CF_UNICODETEXT):
         return None
-    handle = user32.GetClipboardData(_CF_UNICODETEXT)
+    handle = _user32.GetClipboardData(_CF_UNICODETEXT)
     if not handle:
         return None
-    ptr = kernel32.GlobalLock(handle)
+    ptr = _kernel32.GlobalLock(handle)
     if not ptr:
         return None
     try:
@@ -49,27 +73,27 @@ def _get_clipboard_text() -> str | None:
             length += 1
         return ctypes.wstring_at(ptr, length)
     finally:
-        kernel32.GlobalUnlock(handle)
+        _kernel32.GlobalUnlock(handle)
 
 
 def _set_clipboard_text(text: str) -> None:
-    user32 = ctypes.windll.user32
-    kernel32 = ctypes.windll.kernel32
-    user32.EmptyClipboard()
+    _user32.EmptyClipboard()
 
     data = text.encode("utf-16-le") + b"\x00\x00"
     size = len(data)
-    handle = kernel32.GlobalAlloc(_GMEM_MOVEABLE, size)
+    handle = _kernel32.GlobalAlloc(_GMEM_MOVEABLE, size)
     if not handle:
         raise OSError("GlobalAlloc failed")
-    ptr = kernel32.GlobalLock(handle)
+    ptr = _kernel32.GlobalLock(handle)
     if not ptr:
+        _kernel32.GlobalFree(handle)
         raise OSError("GlobalLock failed")
     try:
         ctypes.memmove(ptr, data, size)
     finally:
-        kernel32.GlobalUnlock(handle)
-    if not user32.SetClipboardData(_CF_UNICODETEXT, handle):
+        _kernel32.GlobalUnlock(handle)
+    if not _user32.SetClipboardData(_CF_UNICODETEXT, handle):
+        _kernel32.GlobalFree(handle)
         raise OSError("SetClipboardData failed")
     # ownership transfers to the system after SetClipboardData; do not GlobalFree.
 
