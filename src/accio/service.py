@@ -1,144 +1,35 @@
-"""Launch-at-login via a macOS LaunchAgent.
+"""Launch-at-login: re-export the platform backend.
 
-The dev repo lives under ~/Desktop, a TCC-protected folder that background
-launchd agents cannot read — the venv Python there wedges during interpreter
-startup. So `accio install` deploys a self-contained copy (its own venv, with
-the package and dependencies installed non-editable) under Application Support,
-outside any protected folder, and points the launch agent at that copy.
-
-Re-run `accio install` after code changes to redeploy the snapshot.
+The platform dispatcher picks the macOS LaunchAgent or Windows Startup folder
+implementation based on sys.platform at import time.
 """
 
-import plistlib
-import subprocess
-from pathlib import Path
+from accio.platform import service
 
-LABEL = "com.anuragmerndev.accio"
-PLIST_PATH = Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
-LOG_PATH = Path.home() / ".accio" / "accio.log"
-DEPLOY_DIR = Path.home() / "Library" / "Application Support" / "accio"
-DEPLOY_VENV = DEPLOY_DIR / "venv"
-# user-facing Spotlight app; "Accio" — the Summoning Charm. Internal LABEL and
-# the `accio` CLI stay unchanged.
-APP_NAME = "Accio"
-APP_PATH = Path.home() / "Applications" / f"{APP_NAME}.app"
+install = service.install
+uninstall = service.uninstall
+start = service.start
+stop = service.stop
+restart = service.restart
 
+# macOS extras used by the upstream test suite. These attributes exist on the
+# darwin backend; on other platforms they are None so importing `accio.service`
+# never crashes on a non-darwin machine.
+build_plist = getattr(service, "build_plist", None)
+build_info_plist = getattr(service, "build_info_plist", None)
+launcher_script = getattr(service, "launcher_script", None)
+LABEL = getattr(service, "LABEL", None)
+APP_NAME = getattr(service, "APP_NAME", None)
 
-def build_plist(executable: str, working_dir: str) -> bytes:
-    # PATH is set explicitly because launchd's default omits Homebrew/uv;
-    # working_dir must be outside TCC-protected folders or launchd can't chdir.
-    return plistlib.dumps(
-        {
-            "Label": LABEL,
-            "ProgramArguments": [executable],
-            "WorkingDirectory": working_dir,
-            "RunAtLoad": True,
-            "KeepAlive": {"Crashed": True},
-            "StandardOutPath": str(LOG_PATH),
-            "StandardErrorPath": str(LOG_PATH),
-            "EnvironmentVariables": {
-                "PYTHONUNBUFFERED": "1",
-                "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
-            },
-            "ProcessType": "Interactive",
-        }
-    )
-
-
-def build_info_plist() -> bytes:
-    return plistlib.dumps(
-        {
-            "CFBundleName": APP_NAME,
-            "CFBundleDisplayName": APP_NAME,
-            "CFBundleIdentifier": f"{LABEL}.launcher",
-            "CFBundleExecutable": "accio-launch",
-            "CFBundlePackageType": "APPL",
-            "CFBundleVersion": "1.0",
-            "CFBundleShortVersionString": "1.0",
-            # thin launcher: kickstart the agent, then exit — no Dock presence
-            "LSUIElement": True,
-        }
-    )
-
-
-def launcher_script() -> str:
-    # (re)start the background agent; -k restarts it if already running so a
-    # Spotlight launch always leaves a fresh, healthy instance
-    return (
-        "#!/bin/bash\n"
-        f"exec launchctl kickstart -k gui/$(id -u)/{LABEL}\n"
-    )
-
-
-def build_app_bundle() -> None:
-    """Write ~/Applications/Accio.app — a Spotlight-searchable launcher."""
-    macos = APP_PATH / "Contents" / "MacOS"
-    macos.mkdir(parents=True, exist_ok=True)
-    (APP_PATH / "Contents" / "Info.plist").write_bytes(build_info_plist())
-    launcher = macos / "accio-launch"
-    launcher.write_text(launcher_script())
-    launcher.chmod(0o755)
-    print(f"Created {APP_PATH} (search '{APP_NAME}' in Spotlight to start it)")
-
-
-def _deploy() -> Path:
-    """Install a standalone copy outside protected folders. Returns its binary."""
-    import os
-
-    project_dir = Path(__file__).resolve().parents[2]
-    DEPLOY_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"Deploying a standalone copy to {DEPLOY_DIR} ...")
-    # uv sync --frozen installs the EXACT versions from uv.lock — a fresh
-    # dependency resolution once shipped a transformers release that broke
-    # mlx-lm's tokenizer loading in the deployed copy only.
-    # UV_PROJECT_ENVIRONMENT points the sync at the deploy venv;
-    # --no-editable makes the copy self-contained (a snapshot, not a symlink
-    # back into the TCC-protected repo folder).
-    subprocess.run(
-        ["uv", "sync", "--frozen", "--no-dev", "--no-editable"],
-        check=True,
-        cwd=project_dir,
-        env={**os.environ, "UV_PROJECT_ENVIRONMENT": str(DEPLOY_VENV)},
-    )
-    return DEPLOY_VENV / "bin" / "accio"
-
-
-def install() -> None:
-    executable = _deploy()
-    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    PLIST_PATH.parent.mkdir(parents=True, exist_ok=True)
-    PLIST_PATH.write_bytes(build_plist(str(executable), str(DEPLOY_DIR)))
-    build_app_bundle()
-    # bootout is a no-op if not loaded; ignore its failure, then load fresh
-    subprocess.run(["launchctl", "bootout", f"gui/{_uid()}/{LABEL}"], capture_output=True)
-    subprocess.run(["launchctl", "bootstrap", f"gui/{_uid()}", str(PLIST_PATH)], check=True)
-    print(f"Installed launch agent at {PLIST_PATH}")
-    print("Accio will now start automatically at login.")
-
-
-def uninstall() -> None:
-    subprocess.run(["launchctl", "bootout", f"gui/{_uid()}/{LABEL}"], capture_output=True)
-    if PLIST_PATH.exists():
-        PLIST_PATH.unlink()
-    if APP_PATH.exists():
-        import shutil
-
-        shutil.rmtree(APP_PATH)
-    print("Removed the launch agent and Accio.app. It will no longer start at login.")
-    print(f"(The deployed copy at {DEPLOY_DIR} was left in place; delete it to fully remove.)")
-
-
-def start() -> None:
-    subprocess.run(["launchctl", "kickstart", "-k", f"gui/{_uid()}/{LABEL}"], check=True)
-    print("Accio (re)started.")
-
-
-def stop() -> None:
-    subprocess.run(["launchctl", "bootout", f"gui/{_uid()}/{LABEL}"], capture_output=True)
-    print("Accio stopped (until next login, or `accio start`).")
-
-
-def _uid() -> int:
-    import os
-
-    return os.getuid()
+__all__ = [
+    "install",
+    "uninstall",
+    "start",
+    "stop",
+    "restart",
+    "build_plist",
+    "build_info_plist",
+    "launcher_script",
+    "LABEL",
+    "APP_NAME",
+]

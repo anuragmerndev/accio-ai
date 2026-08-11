@@ -1,4 +1,10 @@
-"""Global push-to-talk: hold a modifier key to record, release to transcribe."""
+"""Global push-to-talk: hold a modifier key to record, release to transcribe.
+
+`pynput` is cross-platform and Exposes the same `Key` enum members on every
+OS. The `KEY_MAP` below accepts a few synonyms so the same `config.toml`
+works across platforms without per-OS edits (e.g. `win_r` on Windows,
+`cmd_r` on macOS — both resolve to the same physical key).
+"""
 
 from collections.abc import Callable
 
@@ -10,6 +16,9 @@ KEY_MAP = {
     "cmd_r": keyboard.Key.cmd_r,
     "ctrl_r": keyboard.Key.ctrl_r,
     "f13": keyboard.Key.f13,
+    # Windows synonyms — `cmd` on pynput Windows maps to the Win/Super key
+    "win_r": keyboard.Key.cmd_r,
+    "win_l": keyboard.Key.cmd_l,
 }
 
 
@@ -46,8 +55,8 @@ class PushToTalk:
         return self._listener is not None and self._listener.is_alive()
 
     def reset_held(self) -> None:
-        """Clear stuck held-state after a missed release event (macOS
-        occasionally drops the modifier flagsChanged event)."""
+        """Clear stuck held-state after a missed release event (OS occasionally
+        drops the modifier flagsChanged event)."""
         self._held = False
 
     def start(self) -> None:

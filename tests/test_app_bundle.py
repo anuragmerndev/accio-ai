@@ -1,6 +1,14 @@
 import plistlib
+import sys
+
+import pytest
 
 from accio.service import LABEL, build_info_plist, launcher_script
+
+pytestmark = pytest.mark.skipif(
+    sys.platform != "darwin",
+    reason="Info.plist and .app bundle are macOS-specific",
+)
 
 
 def test_info_plist_identifies_app():

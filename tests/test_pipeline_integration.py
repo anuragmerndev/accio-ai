@@ -1,7 +1,13 @@
 """Regression test for the MLX thread-local stream bug: submitting utterances
-from a different thread than the one that loaded the models must work."""
+from a different thread than the one that loaded the models must work.
 
+Skipped on non-Apple platforms: the bug is MLX-specific, and the test uses
+the macOS `say` command for fixture synthesis.
+"""
+
+import platform
 import subprocess
+import sys
 import threading
 import wave
 from pathlib import Path
@@ -11,6 +17,12 @@ import pytest
 
 from accio.config import Config
 from accio.pipeline import Pipeline
+
+
+pytestmark = pytest.mark.skipif(
+    sys.platform != "darwin",
+    reason="MLX stream regression + `say` fixture are macOS-only",
+)
 
 
 @pytest.mark.slow

@@ -1,6 +1,15 @@
+import platform
 import plistlib
+import sys
 
-from accio.service import LABEL, build_plist
+import pytest
+
+from accio.service import LABEL, build_plist, install, uninstall, start, stop, restart  # noqa: F401
+
+pytestmark = pytest.mark.skipif(
+    sys.platform != "darwin",
+    reason="plist / LaunchAgent shape is macOS-specific",
+)
 
 
 DEPLOY_BIN = "/Users/me/Library/Application Support/accio/venv/bin/accio"

@@ -1,22 +1,31 @@
 [project]
 name = "accio"
 version = "0.1.0"
-description = "Add your description here"
+description = "Private, on-device voice dictation. Hold a key, speak, get clean text in any app."
 readme = "README.md"
 authors = [
     { name = "anuragmerndev", email = "anuragmerndeveloper@gmail.com" }
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "numpy>=2.4.6",
+    "pynput>=1.8.2",
+    "sounddevice>=0.5.5",
+]
+
+[project.optional-dependencies]
+darwin = [
     "mlx-lm>=0.31.3",
     "mlx-whisper>=0.4.3",
-    "numpy>=2.4.6",
     "parakeet-mlx>=0.5.2",
-    "pynput>=1.8.2",
     "pyobjc-framework-cocoa>=12.2.1",
     "pyobjc-framework-quartz>=12.2.1",
     "rumps>=0.4.0",
-    "sounddevice>=0.5.5",
+]
+windows = [
+    "faster-whisper>=1.0.3",
+    "pillow>=10.0.0",
+    "pystray>=0.19.4",
 ]
 
 [project.scripts]
