@@ -23,7 +23,7 @@ class Config:
     llm_backend: str = "mlx"  # "mlx" or "ollama"
     ollama_model: str = "llama3.2"
     ollama_url: str = "http://localhost:11434"
-    hotkey: str = "alt_r"
+    hotkey: str = "alt_r,shift_r"
     min_utterance_seconds: float = 0.3
     # skip audio too quiet to be speech — stops Whisper's "Thank you" silence
     # hallucination from being pasted (peak amplitude, 0..1)
