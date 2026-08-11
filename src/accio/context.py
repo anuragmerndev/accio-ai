@@ -1,33 +1,15 @@
-"""Frontmost-app detection → tone hint for the polish pass."""
+"""Frontmost-app detection: re-export the platform backend.
 
-from AppKit import NSWorkspace
+See accio.platform.darwin.context / accio.platform.windows.context for the
+concrete implementation selected at import time.
+"""
 
-APP_TONES = {
-    "slack": "chat",
-    "discord": "chat",
-    "messages": "chat",
-    "whatsapp": "chat",
-    "telegram": "chat",
-    "mail": "email",
-    "outlook": "email",
-    "gmail": "email",
-    "code": "code",
-    "cursor": "code",
-    "terminal": "code",
-    "iterm2": "code",
-    "xcode": "code",
-    "zed": "code",
-}
+from accio.platform import context
 
+frontmost_app_name = context.frontmost_app_name
+tone_for_app = context.tone_for_app
 
-def frontmost_app_name() -> str:
-    app = NSWorkspace.sharedWorkspace().frontmostApplication()
-    return app.localizedName() if app else ""
+# Exposed so tests and inspection tools can introspect the per-platform map
+APP_TONES = context.APP_TONES
 
-
-def tone_for_app(app_name: str) -> str:
-    name = app_name.lower()
-    for key, tone in APP_TONES.items():
-        if key in name:
-            return tone
-    return "default"
+__all__ = ["frontmost_app_name", "tone_for_app", "APP_TONES"]

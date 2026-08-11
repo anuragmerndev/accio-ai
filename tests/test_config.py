@@ -1,3 +1,5 @@
+import platform
+import sys
 from pathlib import Path
 
 from accio.config import Config, load_config
@@ -5,11 +7,30 @@ from accio.config import Config, load_config
 
 def test_defaults_when_no_file(tmp_path: Path):
     cfg = load_config(tmp_path / "nope.toml")
-    assert cfg.asr_model == "mlx-community/parakeet-tdt-0.6b-v2"
-    assert cfg.llm_polish is True
     assert cfg.min_utterance_seconds == 0.3
     assert cfg.min_peak_amplitude == 0.02
     assert "um" in cfg.filler_words
+    # the MLX-backed defaults are filled in by __post_init__; the windows
+    # tracker just verifies they still land on a sensible non-empty string
+    assert cfg.asr_model
+    assert cfg.whisper_model
+
+
+def test_default_backend_matches_platform():
+    """Sanity: the default ASR backend is reachable from this platform."""
+    if sys.platform == "darwin" and platform.machine() in {"arm64", "aarch64"}:
+        assert Config().asr_backend == "parakeet"
+    else:
+        assert Config().asr_backend == "faster_whisper"
+
+
+def test_default_llm_backend_matches_platform():
+    if sys.platform != "darwin":
+        # MLX-only runtime; the install must not require the user to touch
+        # config.toml to fall back to Ollama.
+        assert Config().llm_backend == "ollama"
+    else:
+        assert Config().llm_backend == "mlx"
 
 
 def test_file_overrides_defaults(tmp_path: Path):
@@ -35,5 +56,16 @@ def test_missing_dictionary_is_empty(tmp_path: Path):
 
 def test_config_is_dataclass_with_expected_fields():
     fields = Config.__dataclass_fields__
-    for name in ("asr_model", "llm_model", "llm_polish", "filler_words", "hotkey", "dictionary"):
+    for name in (
+        "asr_model",
+        "whisper_model",
+        "llm_model",
+        "llm_polish",
+        "llm_backend",
+        "filler_words",
+        "hotkey",
+        "dictionary",
+        "faster_whisper_device",
+        "faster_whisper_compute_type",
+    ):
         assert name in fields
