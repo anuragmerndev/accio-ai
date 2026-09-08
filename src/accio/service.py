@@ -114,21 +114,35 @@ def _deploy() -> Path:
     return DEPLOY_VENV / "bin" / "accio"
 
 
+def _reload_agent() -> None:
+    """Restart the agent under the current plist. bootout is async, so we wait
+    for it to settle before bootstrapping — otherwise bootstrap races a still-
+    loaded job (exit 5). Fall back to kickstart if it somehow stays loaded."""
+    import time
+
+    domain = f"gui/{_uid()}"
+    subprocess.run(["launchctl", "bootout", f"{domain}/{LABEL}"], capture_output=True)
+    for _ in range(20):  # up to ~2s for the job to fully unload
+        loaded = subprocess.run(
+            ["launchctl", "print", f"{domain}/{LABEL}"], capture_output=True
+        )
+        if loaded.returncode != 0:
+            break
+        time.sleep(0.1)
+    bootstrap = subprocess.run(
+        ["launchctl", "bootstrap", domain, str(PLIST_PATH)], capture_output=True
+    )
+    if bootstrap.returncode != 0:
+        subprocess.run(["launchctl", "kickstart", "-k", f"{domain}/{LABEL}"], check=True)
+
+
 def install() -> None:
     executable = _deploy()
     LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     PLIST_PATH.parent.mkdir(parents=True, exist_ok=True)
     PLIST_PATH.write_bytes(build_plist(str(executable), str(DEPLOY_DIR)))
     build_app_bundle()
-    # bootout is a no-op if not loaded; ignore its failure, then load fresh.
-    # bootout is async, so a KeepAlive relaunch can leave the agent still loaded
-    # when bootstrap runs (exit 5) — fall back to kickstart -k to restart it.
-    subprocess.run(["launchctl", "bootout", f"gui/{_uid()}/{LABEL}"], capture_output=True)
-    bootstrap = subprocess.run(
-        ["launchctl", "bootstrap", f"gui/{_uid()}", str(PLIST_PATH)], capture_output=True
-    )
-    if bootstrap.returncode != 0:
-        subprocess.run(["launchctl", "kickstart", "-k", f"gui/{_uid()}/{LABEL}"], check=True)
+    _reload_agent()
     print(f"Installed launch agent at {PLIST_PATH}")
     print("Accio will now start automatically at login.")
 
