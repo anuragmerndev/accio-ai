@@ -24,6 +24,11 @@ from accio.pipeline import Pipeline
 IDLE, RECORDING, PROCESSING, LOADING = "🎤", "🔴", "⏳", "…"
 
 WATCHDOG_INTERVAL_SECONDS = 5
+# hold a push-to-talk key this long before the mic opens. A key that doubles as
+# a typing key (right Shift for a capital) is tapped far faster than this, so
+# typing never opens the audio stream — which otherwise thrashes CoreAudio and
+# eventually wedges the audio worker.
+HOLD_TO_TALK_SECONDS = 0.25
 
 
 def ensure_input_monitoring() -> bool:
@@ -67,6 +72,9 @@ class AccioApp(rumps.App):
             on_done=self._on_utterance_done,
         )
         self._recording_since: float | None = None
+        self._pending_start = False
+        self._start_timer: threading.Timer | None = None
+        self._press_lock = threading.Lock()
         self._audio_events: queue.Queue = queue.Queue()
         threading.Thread(target=self._audio_worker, daemon=True).start()
         ensure_input_monitoring()
@@ -102,15 +110,34 @@ class AccioApp(rumps.App):
     # --- hotkey callbacks: enqueue only, never block the listener thread ---
 
     def _on_press(self) -> None:
-        if not self.enabled or not self.pipeline.ready or self._recording_since:
+        if not self.enabled or not self.pipeline.ready:
             return
-        self._recording_since = time.time()
+        with self._press_lock:
+            if self._pending_start or self._recording_since:
+                return
+            # defer opening the mic; a quick tap cancels before this fires
+            self._pending_start = True
+            self._start_timer = threading.Timer(HOLD_TO_TALK_SECONDS, self._begin_recording)
+            self._start_timer.start()
+
+    def _begin_recording(self) -> None:
+        with self._press_lock:
+            if not self._pending_start:  # released within the hold window: a tap
+                return
+            self._pending_start = False
+            self._recording_since = time.time()
         self.title = RECORDING
         self._audio_events.put("start")
 
     def _on_release(self) -> None:
-        if not self.pipeline.ready or not self._recording_since:
-            return
+        with self._press_lock:
+            if self._pending_start:  # tapped and let go before the mic opened
+                self._pending_start = False
+                if self._start_timer is not None:
+                    self._start_timer.cancel()
+                return
+            if not self.pipeline.ready or not self._recording_since:
+                return
         self._audio_events.put("stop")
 
     # --- audio worker: owns all CoreAudio calls, serially ---
