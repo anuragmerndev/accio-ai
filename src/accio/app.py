@@ -62,6 +62,7 @@ class AccioApp(rumps.App):
         self.menu = [
             rumps.MenuItem("Enabled", callback=self._toggle_enabled),
             rumps.MenuItem("LLM polish", callback=self._toggle_polish),
+            rumps.MenuItem("Stop", callback=self._stop),
         ]
         self.menu["Enabled"].state = True
         self.menu["LLM polish"].state = cfg.llm_polish
@@ -98,6 +99,23 @@ class AccioApp(rumps.App):
 
     def _on_utterance_done(self) -> None:
         self.title = IDLE
+
+    def _stop(self, _item) -> None:
+        # manual equivalent of releasing the hotkey: finalize the current
+        # recording (transcribe + paste what was captured) and clear any stuck
+        # press state so the next hotkey works. Recovers a missed-release stall.
+        with self._press_lock:
+            # never opened the mic (still inside the hold window): just cancel
+            if self._pending_start:
+                self._pending_start = False
+                if self._start_timer is not None:
+                    self._start_timer.cancel()
+            recording = self._recording_since is not None
+        self.hotkey.reset_held()  # clear phantom held-key state
+        if recording:
+            self._audio_events.put("stop")  # worker stops stream, transcribes, pastes
+        else:
+            self.title = IDLE
 
     def _toggle_enabled(self, item) -> None:
         self.enabled = not self.enabled
