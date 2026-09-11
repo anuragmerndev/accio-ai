@@ -29,6 +29,62 @@ WATCHDOG_INTERVAL_SECONDS = 5
 # typing never opens the audio stream — which otherwise thrashes CoreAudio and
 # eventually wedges the audio worker.
 HOLD_TO_TALK_SECONDS = 0.25
+# opening/closing the mic should be near-instant; longer means a CoreAudio call
+# has wedged (audio-daemon/device hiccup). A wedged C call can't be interrupted
+# from Python, so we abandon that call and rebuild the recorder instead of
+# freezing the whole app forever.
+RECORDER_TIMEOUT_SECONDS = 5.0
+
+
+def _call_with_timeout(fn, timeout: float):
+    """Run fn() on a throwaway thread, waiting up to `timeout`. Returns
+    (ok, result, elapsed). On timeout the thread is abandoned (a blocked
+    CoreAudio C call is uninterruptible), so the caller must discard whatever
+    fn was operating on rather than reuse it."""
+    box: dict = {}
+
+    def run():
+        try:
+            box["value"] = fn()
+        except Exception as e:  # surfaced on the caller thread below
+            box["error"] = e
+
+    t = threading.Thread(target=run, daemon=True)
+    t0 = time.time()
+    t.start()
+    t.join(timeout)
+    elapsed = time.time() - t0
+    if t.is_alive():
+        return False, None, elapsed
+    if "error" in box:
+        raise box["error"]
+    return True, box.get("value"), elapsed
+
+
+class _TimestampedStream:
+    """Prefix every stdout/stderr line with a timestamp, so a log that ends
+    mid-operation pinpoints exactly when — and on which line — it froze."""
+
+    def __init__(self, stream):
+        self._stream = stream
+        self._at_line_start = True
+
+    def write(self, text: str) -> None:
+        if not text:
+            return
+        stamp = time.strftime("%H:%M:%S ")
+        out = []
+        for ch in text:
+            if self._at_line_start and ch != "\n":
+                out.append(stamp)
+                self._at_line_start = False
+            out.append(ch)
+            if ch == "\n":
+                self._at_line_start = True
+        self._stream.write("".join(out))
+
+    def flush(self) -> None:
+        self._stream.flush()
 
 
 def ensure_input_monitoring() -> bool:
@@ -91,11 +147,14 @@ class AccioApp(rumps.App):
         print("Models loaded. Hold your hotkey and speak.")
 
     def _on_text(self, text: str) -> None:
+        print("→ paste")
+        t0 = time.time()
         try:
             paste_text(text)
         except Exception as e:
             print(f"Paste failed ({e}); text left on clipboard")
             copy_only(text)
+        print(f"← paste {time.time() - t0:.2f}s")
 
     def _on_utterance_done(self) -> None:
         self.title = IDLE
@@ -165,10 +224,23 @@ class AccioApp(rumps.App):
             event = self._audio_events.get()
             try:
                 if event == "start":
-                    self.recorder.start()
+                    ok, _, dt = _call_with_timeout(
+                        self.recorder.start, RECORDER_TIMEOUT_SECONDS
+                    )
+                    if not ok:
+                        self._recover_recorder("start")
+                    elif dt > 0.5:
+                        print(f"recorder.start slow: {dt:.2f}s")
                 elif event == "stop":
-                    audio = self.recorder.stop()
+                    ok, audio, dt = _call_with_timeout(
+                        self.recorder.stop, RECORDER_TIMEOUT_SECONDS
+                    )
                     self._recording_since = None
+                    if not ok:
+                        self._recover_recorder("stop")
+                        continue
+                    if dt > 0.5:
+                        print(f"recorder.stop slow: {dt:.2f}s")
                     if self.recorder.duration(audio) < self.cfg.min_utterance_seconds:
                         self.title = IDLE
                         continue
@@ -179,6 +251,19 @@ class AccioApp(rumps.App):
                 print(f"Audio worker error on {event!r}: {e}")
                 self._recording_since = None
                 self.title = IDLE
+
+    def _recover_recorder(self, where: str) -> None:
+        # a CoreAudio call wedged; the old recorder (and its stuck thread) is
+        # abandoned and a fresh one takes over so the app stays responsive.
+        # ponytail: leaks one blocked daemon thread per wedge — acceptable for a
+        # rare event; the alternative (killing a thread mid-C-call) isn't safe.
+        print(
+            f"recorder.{where} wedged (>{RECORDER_TIMEOUT_SECONDS}s); "
+            "rebuilding recorder and dropping this recording"
+        )
+        self.recorder = Recorder()
+        self._recording_since = None
+        self.title = IDLE
 
     # --- watchdog: recover from a dead listener or a missed release event ---
 
@@ -204,5 +289,9 @@ class AccioApp(rumps.App):
 
 
 def main() -> None:
+    import sys
+
+    sys.stdout = _TimestampedStream(sys.stdout)
+    sys.stderr = _TimestampedStream(sys.stderr)
     cfg = load_config()
     AccioApp(cfg).run()

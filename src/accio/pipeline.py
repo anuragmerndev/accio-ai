@@ -7,6 +7,7 @@ A persistent worker thread owns load + inference; utterances arrive via queue.
 
 import queue
 import threading
+import time
 from collections.abc import Callable
 
 import numpy as np
@@ -98,7 +99,10 @@ class Pipeline:
                     # hallucination ("Thank you.") never reaches the cursor
                     print(f"skipped: no speech (peak={peak:.4f})")
                     continue
+                print("→ transcribe")
+                t0 = time.time()
                 text, language = transcriber.transcribe(audio)
+                print(f"← transcribe {time.time() - t0:.2f}s")
                 # gate on the script actually present, not just Whisper's
                 # language tag — accents make the tag flaky (English speech
                 # tagged "hi" was skipping polish entirely)
@@ -116,7 +120,10 @@ class Pipeline:
                     and should_polish(text, language, self.cfg.polish_languages)
                 )
                 if polished:
+                    print("→ polish")
+                    t0 = time.time()
                     text = polisher.polish(text, tone)
+                    print(f"← polish {time.time() - t0:.2f}s")
                 print(
                     f"utterance: lang={language} tone={tone} peak={peak:.3f} "
                     f"romanize={bool(romanized)} polish={bool(polished)}"
