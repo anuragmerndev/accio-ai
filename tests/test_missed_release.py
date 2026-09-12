@@ -1,5 +1,6 @@
-"""The watchdog catches a dropped key-release event fast by polling physical
-key state, instead of waiting for the max-length cap."""
+"""The watchdog catches a dropped key-release event by polling physical key
+state — but only after two consecutive 'up' checks, so it never truncates
+someone who is still holding the key and speaking."""
 
 import queue
 import time
@@ -21,7 +22,8 @@ def _make_app(key_down: bool):
     a = object.__new__(AccioApp)
     a.hotkey = _Hotkey()
     a._recording_since = time.time()  # recent, so the max-length cap doesn't fire
-    a._trigger_vks = [60]  # right shift
+    a._trigger_names = ["shift_r"]
+    a._release_misses = 0
     a._audio_events = queue.Queue()
     a._any_trigger_down = lambda: key_down
 
@@ -39,14 +41,28 @@ def _events(a):
     return out
 
 
-def test_missed_release_stops_when_key_not_down():
-    a = _make_app(key_down=False)  # we think we're recording, but nothing is held
+def test_missed_release_stops_after_two_checks():
+    a = _make_app(key_down=False)
     a._watchdog(None)
-    assert _events(a) == ["stop"]
+    assert _events(a) == []  # one miss: not yet
+    a._watchdog(None)
+    assert _events(a) == ["stop"]  # second consecutive miss: stop, keep audio
     assert a.hotkey.reset_calls == 1
 
 
-def test_key_still_held_keeps_recording():
-    a = _make_app(key_down=True)  # legitimately holding to talk
+def test_key_still_held_never_stops_and_resets():
+    a = _make_app(key_down=False)
+    a._watchdog(None)  # one miss
+    a._any_trigger_down = lambda: True  # user is holding and speaking
     a._watchdog(None)
-    assert _events(a) == []  # not stopped
+    assert a._release_misses == 0  # streak reset
+    a._watchdog(None)
+    assert _events(a) == []  # never truncated
+
+
+def test_streak_resets_when_not_recording():
+    a = _make_app(key_down=False)
+    a._watchdog(None)  # one miss
+    a._recording_since = None
+    a._watchdog(None)
+    assert a._release_misses == 0

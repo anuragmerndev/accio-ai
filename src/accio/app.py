@@ -34,14 +34,22 @@ HOLD_TO_TALK_SECONDS = 0.25
 # from Python, so we abandon that call and rebuild the recorder instead of
 # freezing the whole app forever.
 RECORDER_TIMEOUT_SECONDS = 5.0
-# macOS virtual keycodes for the modifier keys we support as hotkeys, used to
-# poll real physical key state (CGEventSourceKeyState) and catch a dropped
-# release event. Names match accio.hotkey.KEY_MAP.
+# macOS virtual keycodes for our hotkeys (names match accio.hotkey.KEY_MAP),
+# used to poll a non-modifier key's physical state (f13). Modifier keys are
+# polled by flag mask instead — see _MODIFIER_FLAG — because per-keycode
+# CGEventSourceKeyState misreports a held right-modifier as "up".
 _HOTKEY_VK = {
     "alt_r": 61, "alt_l": 58,
     "cmd_r": 54, "ctrl_r": 62,
     "shift_r": 60, "shift_l": 56,
     "f13": 105,
+}
+# hotkey name → the Quartz modifier-flag attribute that is set while it's held.
+_MODIFIER_FLAG = {
+    "shift_r": "kCGEventFlagMaskShift", "shift_l": "kCGEventFlagMaskShift",
+    "alt_r": "kCGEventFlagMaskAlternate", "alt_l": "kCGEventFlagMaskAlternate",
+    "cmd_r": "kCGEventFlagMaskCommand",
+    "ctrl_r": "kCGEventFlagMaskControl",
 }
 
 
@@ -141,11 +149,10 @@ class AccioApp(rumps.App):
         self._pending_start = False
         self._start_timer: threading.Timer | None = None
         self._wedge_count = 0  # consecutive recorder wedges; triggers restart
-        self._trigger_vks = [
-            _HOTKEY_VK[n.strip()]
-            for n in cfg.hotkey.split(",")
-            if n.strip() in _HOTKEY_VK
+        self._trigger_names = [
+            n.strip() for n in cfg.hotkey.split(",") if n.strip() in _HOTKEY_VK
         ]
+        self._release_misses = 0  # consecutive watchdog ticks with no key down
         self._press_lock = threading.Lock()
         self._audio_events: queue.Queue = queue.Queue()
         threading.Thread(target=self._audio_worker, daemon=True).start()
@@ -315,16 +322,25 @@ class AccioApp(rumps.App):
             self.hotkey = PushToTalk(self.cfg.hotkey, self._on_press, self._on_release)
             self.hotkey.start()
         # macOS drops modifier release events (right Shift especially), leaving
-        # a recording running until the max-length cap. Catch it fast by polling
-        # the key's real physical state: if we think we're recording but no
-        # trigger key is actually down, the release was missed — stop now and
-        # keep the audio, instead of holding the mic open for the full cap (a
-        # long-stale stream is what wedges CoreAudio on close).
-        if self._recording_since and self._trigger_vks and not self._any_trigger_down():
-            print("no trigger key down but still recording (missed release); stopping")
-            self.hotkey.reset_held()
-            self._audio_events.put("stop")
-            return
+        # a recording running until the max-length cap. Catch it faster by
+        # polling the trigger's real state: if we think we're recording but the
+        # key isn't down for TWO consecutive checks (~10s), the release was
+        # missed — stop and keep the audio. Two checks + reading modifier flags
+        # (not per-keycode, which misreports a held modifier) avoids truncating
+        # someone who is simply still holding the key and speaking.
+        if not self._recording_since:
+            self._release_misses = 0
+        elif self._trigger_names:
+            if self._any_trigger_down():
+                self._release_misses = 0
+            else:
+                self._release_misses += 1
+                if self._release_misses >= 2:
+                    print("trigger key up for two checks; stopping (missed release)")
+                    self._release_misses = 0
+                    self.hotkey.reset_held()
+                    self._audio_events.put("stop")
+                    return
         if (
             self._recording_since
             and time.time() - self._recording_since > self.cfg.max_recording_seconds
@@ -337,15 +353,22 @@ class AccioApp(rumps.App):
             self._audio_events.put("stop")
 
     def _any_trigger_down(self) -> bool:
-        from Quartz import (
-            CGEventSourceKeyState,
-            kCGEventSourceStateCombinedSessionState,
-        )
+        import Quartz
 
-        return any(
-            CGEventSourceKeyState(kCGEventSourceStateCombinedSessionState, vk)
-            for vk in self._trigger_vks
-        )
+        state = Quartz.kCGEventSourceStateHIDSystemState
+        # modifier keys: read the live flag mask (reliable for a held modifier)
+        flags = Quartz.CGEventSourceFlagsState(state)
+        for name in self._trigger_names:
+            attr = _MODIFIER_FLAG.get(name)
+            if attr and flags & getattr(Quartz, attr):
+                return True
+        # non-modifier keys (e.g. f13): per-keycode state is fine
+        for name in self._trigger_names:
+            if name not in _MODIFIER_FLAG and Quartz.CGEventSourceKeyState(
+                state, _HOTKEY_VK[name]
+            ):
+                return True
+        return False
 
 
 def main() -> None:
