@@ -34,6 +34,15 @@ HOLD_TO_TALK_SECONDS = 0.25
 # from Python, so we abandon that call and rebuild the recorder instead of
 # freezing the whole app forever.
 RECORDER_TIMEOUT_SECONDS = 5.0
+# macOS virtual keycodes for the modifier keys we support as hotkeys, used to
+# poll real physical key state (CGEventSourceKeyState) and catch a dropped
+# release event. Names match accio.hotkey.KEY_MAP.
+_HOTKEY_VK = {
+    "alt_r": 61, "alt_l": 58,
+    "cmd_r": 54, "ctrl_r": 62,
+    "shift_r": 60, "shift_l": 56,
+    "f13": 105,
+}
 
 
 def _call_with_timeout(fn, timeout: float):
@@ -131,6 +140,12 @@ class AccioApp(rumps.App):
         self._recording_since: float | None = None
         self._pending_start = False
         self._start_timer: threading.Timer | None = None
+        self._wedge_count = 0  # consecutive recorder wedges; triggers restart
+        self._trigger_vks = [
+            _HOTKEY_VK[n.strip()]
+            for n in cfg.hotkey.split(",")
+            if n.strip() in _HOTKEY_VK
+        ]
         self._press_lock = threading.Lock()
         self._audio_events: queue.Queue = queue.Queue()
         threading.Thread(target=self._audio_worker, daemon=True).start()
@@ -229,8 +244,10 @@ class AccioApp(rumps.App):
                     )
                     if not ok:
                         self._recover_recorder("start")
-                    elif dt > 0.5:
-                        print(f"recorder.start slow: {dt:.2f}s")
+                    else:
+                        self._wedge_count = 0
+                        if dt > 0.5:
+                            print(f"recorder.start slow: {dt:.2f}s")
                 elif event == "stop":
                     ok, audio, dt = _call_with_timeout(
                         self.recorder.stop, RECORDER_TIMEOUT_SECONDS
@@ -239,6 +256,7 @@ class AccioApp(rumps.App):
                     if not ok:
                         self._recover_recorder("stop")
                         continue
+                    self._wedge_count = 0
                     if dt > 0.5:
                         print(f"recorder.stop slow: {dt:.2f}s")
                     if self.recorder.duration(audio) < self.cfg.min_utterance_seconds:
@@ -253,17 +271,37 @@ class AccioApp(rumps.App):
                 self.title = IDLE
 
     def _recover_recorder(self, where: str) -> None:
-        # a CoreAudio call wedged; the old recorder (and its stuck thread) is
-        # abandoned and a fresh one takes over so the app stays responsive.
-        # ponytail: leaks one blocked daemon thread per wedge — acceptable for a
-        # rare event; the alternative (killing a thread mid-C-call) isn't safe.
+        # a CoreAudio call wedged. First try a cheap rebuild in case it was a
+        # transient hiccup; the fresh Recorder still shares the process-global
+        # PortAudio library, so if that library itself is wedged the very next
+        # start/stop wedges too. On a repeat wedge, only a process restart clears
+        # it — launchd relaunches us with a fresh audio subsystem.
+        # ponytail: each wedge leaks one blocked daemon thread; the escalating
+        # restart caps the damage. Killing a thread mid-C-call isn't safe.
+        self._wedge_count += 1
         print(
             f"recorder.{where} wedged (>{RECORDER_TIMEOUT_SECONDS}s); "
-            "rebuilding recorder and dropping this recording"
+            f"rebuilding recorder (wedge #{self._wedge_count}), dropping this recording"
         )
         self.recorder = Recorder()
         self._recording_since = None
         self.title = IDLE
+        if self._wedge_count >= 2:
+            print("audio subsystem wedged repeatedly; restarting the app to reset it")
+            self._restart_process()
+
+    def _restart_process(self) -> None:
+        import os
+
+        from accio import service
+
+        try:
+            service.start()  # launchctl kickstart -k: launchd kills + relaunches us
+        except Exception as e:
+            # not under launchd (dev run) or kickstart failed: abort so the
+            # LaunchAgent's KeepAlive(Crashed) relaunches a clean process
+            print(f"kickstart failed ({e}); aborting for relaunch")
+            os.abort()
 
     # --- watchdog: recover from a dead listener or a missed release event ---
 
@@ -276,6 +314,17 @@ class AccioApp(rumps.App):
                 pass
             self.hotkey = PushToTalk(self.cfg.hotkey, self._on_press, self._on_release)
             self.hotkey.start()
+        # macOS drops modifier release events (right Shift especially), leaving
+        # a recording running until the max-length cap. Catch it fast by polling
+        # the key's real physical state: if we think we're recording but no
+        # trigger key is actually down, the release was missed — stop now and
+        # keep the audio, instead of holding the mic open for the full cap (a
+        # long-stale stream is what wedges CoreAudio on close).
+        if self._recording_since and self._trigger_vks and not self._any_trigger_down():
+            print("no trigger key down but still recording (missed release); stopping")
+            self.hotkey.reset_held()
+            self._audio_events.put("stop")
+            return
         if (
             self._recording_since
             and time.time() - self._recording_since > self.cfg.max_recording_seconds
@@ -286,6 +335,17 @@ class AccioApp(rumps.App):
             )
             self.hotkey.reset_held()
             self._audio_events.put("stop")
+
+    def _any_trigger_down(self) -> bool:
+        from Quartz import (
+            CGEventSourceKeyState,
+            kCGEventSourceStateCombinedSessionState,
+        )
+
+        return any(
+            CGEventSourceKeyState(kCGEventSourceStateCombinedSessionState, vk)
+            for vk in self._trigger_vks
+        )
 
 
 def main() -> None:
