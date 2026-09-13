@@ -32,3 +32,14 @@ def test_second_consecutive_wedge_restarts():
     a._recover_recorder("start")
     assert a._wedge_count == 2
     assert a._restarts == 1  # escalated to a process restart
+
+
+def test_stop_wedge_then_start_wedge_escalates():
+    # regression: a stop-wedge (#1) followed by a start-wedge must reach the
+    # restart. Previously a trivial stop on the rebuilt recorder reset the
+    # streak, so every wedge logged "#1" and the restart never fired.
+    a = _make_app()
+    a._recover_recorder("stop")
+    assert a._restarts == 0
+    a._recover_recorder("start")
+    assert a._restarts == 1

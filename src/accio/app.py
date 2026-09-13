@@ -263,7 +263,11 @@ class AccioApp(rumps.App):
                     if not ok:
                         self._recover_recorder("stop")
                         continue
-                    self._wedge_count = 0
+                    # NOTE: do not reset _wedge_count here. A stop on a
+                    # just-rebuilt recorder (no open stream) returns instantly
+                    # and would mask a real wedge streak, so the restart never
+                    # fires. Only a successful start (above) proves the audio
+                    # subsystem is actually alive.
                     if dt > 0.5:
                         print(f"recorder.stop slow: {dt:.2f}s")
                     if self.recorder.duration(audio) < self.cfg.min_utterance_seconds:
