@@ -43,12 +43,13 @@ class Pipeline:
         self,
         cfg: Config,
         on_ready: Callable[[bool], None],
-        on_result: Callable[[str], None],
+        on_result: Callable[[str, str], None],
         on_done: Callable[[], None],
     ):
-        """on_ready(llm_available) fires after models load; on_result(text) per
-        utterance with non-empty text; on_done() after each utterance regardless.
-        All callbacks run on the worker thread."""
+        """on_ready(llm_available) fires after models load; on_result(text, origin)
+        per utterance with non-empty text (origin = the app focused when recording
+        started, for placement); on_done() after each utterance regardless. All
+        callbacks run on the worker thread."""
         self.cfg = cfg
         self.on_ready = on_ready
         self.on_result = on_result
@@ -62,8 +63,8 @@ class Pipeline:
     def ready(self) -> bool:
         return self._ready.is_set()
 
-    def submit(self, audio: np.ndarray, tone: str) -> None:
-        self._jobs.put((audio, tone))
+    def submit(self, audio: np.ndarray, tone: str, origin: str = "") -> None:
+        self._jobs.put((audio, tone, origin))
 
     def _worker(self) -> None:
         from accio.asr import make_transcriber
@@ -89,7 +90,7 @@ class Pipeline:
         self.on_ready(polisher is not None)
 
         while True:
-            audio, tone = self._jobs.get()
+            audio, tone, origin = self._jobs.get()
             try:
                 import numpy as np
 
@@ -129,7 +130,7 @@ class Pipeline:
                     f"romanize={bool(romanized)} polish={bool(polished)}"
                 )
                 if text:
-                    self.on_result(text)
+                    self.on_result(text, origin)
             except Exception as e:
                 print(f"Pipeline error: {e}")
             finally:

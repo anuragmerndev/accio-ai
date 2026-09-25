@@ -14,6 +14,7 @@ import time
 
 import rumps
 
+from accio import history
 from accio.audio import Recorder
 from accio.config import Config, load_config
 from accio.context import frontmost_app_name, tone_for_app
@@ -29,11 +30,8 @@ WATCHDOG_INTERVAL_SECONDS = 5
 # typing never opens the audio stream — which otherwise thrashes CoreAudio and
 # eventually wedges the audio worker.
 HOLD_TO_TALK_SECONDS = 0.25
-# opening/closing the mic should be near-instant; longer means a CoreAudio call
-# has wedged (audio-daemon/device hiccup). A wedged C call can't be interrupted
-# from Python, so we abandon that call and rebuild the recorder instead of
-# freezing the whole app forever.
-RECORDER_TIMEOUT_SECONDS = 5.0
+# how many past dictations to keep in the menu-bar "Recent" submenu
+RECENT_COUNT = 10
 # macOS virtual keycodes for our hotkeys (names match accio.hotkey.KEY_MAP),
 # used to poll a non-modifier key's physical state (f13). Modifier keys are
 # polled by flag mask instead — see _MODIFIER_FLAG — because per-keycode
@@ -51,31 +49,6 @@ _MODIFIER_FLAG = {
     "cmd_r": "kCGEventFlagMaskCommand",
     "ctrl_r": "kCGEventFlagMaskControl",
 }
-
-
-def _call_with_timeout(fn, timeout: float):
-    """Run fn() on a throwaway thread, waiting up to `timeout`. Returns
-    (ok, result, elapsed). On timeout the thread is abandoned (a blocked
-    CoreAudio C call is uninterruptible), so the caller must discard whatever
-    fn was operating on rather than reuse it."""
-    box: dict = {}
-
-    def run():
-        try:
-            box["value"] = fn()
-        except Exception as e:  # surfaced on the caller thread below
-            box["error"] = e
-
-    t = threading.Thread(target=run, daemon=True)
-    t0 = time.time()
-    t.start()
-    t.join(timeout)
-    elapsed = time.time() - t0
-    if t.is_alive():
-        return False, None, elapsed
-    if "error" in box:
-        raise box["error"]
-    return True, box.get("value"), elapsed
 
 
 class _TimestampedStream:
@@ -132,10 +105,15 @@ class AccioApp(rumps.App):
         self.cfg = cfg
         self.recorder = Recorder()
         self.enabled = True
+        self._recent_slots = [rumps.MenuItem("(empty)") for _ in range(RECENT_COUNT)]
+        recent_menu = rumps.MenuItem("Recent")
+        for slot in self._recent_slots:
+            recent_menu.add(slot)
         self.menu = [
             rumps.MenuItem("Enabled", callback=self._toggle_enabled),
             rumps.MenuItem("LLM polish", callback=self._toggle_polish),
             rumps.MenuItem("Stop", callback=self._stop),
+            recent_menu,
         ]
         self.menu["Enabled"].state = True
         self.menu["LLM polish"].state = cfg.llm_polish
@@ -148,7 +126,6 @@ class AccioApp(rumps.App):
         self._recording_since: float | None = None
         self._pending_start = False
         self._start_timer: threading.Timer | None = None
-        self._wedge_count = 0  # consecutive recorder wedges; triggers restart
         self._trigger_names = [
             n.strip() for n in cfg.hotkey.split(",") if n.strip() in _HOTKEY_VK
         ]
@@ -161,6 +138,7 @@ class AccioApp(rumps.App):
         self.hotkey.start()
         self._watchdog_timer = rumps.Timer(self._watchdog, WATCHDOG_INTERVAL_SECONDS)
         self._watchdog_timer.start()
+        self._refresh_recent()  # populate from prior sessions' history
 
     def _on_models_ready(self, llm_available: bool) -> None:
         if not llm_available:
@@ -168,15 +146,52 @@ class AccioApp(rumps.App):
         self.title = IDLE
         print("Models loaded. Hold your hotkey and speak.")
 
-    def _on_text(self, text: str) -> None:
-        print("→ paste")
-        t0 = time.time()
-        try:
-            paste_text(text)
-        except Exception as e:
-            print(f"Paste failed ({e}); text left on clipboard")
+    def _on_text(self, text: str, origin: str = "") -> None:
+        # only auto-paste if the same app is still focused; if you moved away
+        # while it was transcribing, hold the text on the clipboard instead of
+        # firing ⌘V into the wrong place. Either way it's saved to history.
+        current = frontmost_app_name()
+        if self._paste_target_matches(origin, current):
+            try:
+                paste_text(text)
+            except Exception as e:
+                print(f"Paste failed ({e}); text left on clipboard")
+                copy_only(text)
+            pasted = True
+        else:
             copy_only(text)
-        print(f"← paste {time.time() - t0:.2f}s")
+            print(f"focus moved ({origin!r} → {current!r}); held on clipboard")
+            self._notify_ready(text)
+            pasted = False
+        history.append(text, pasted=pasted)
+        self._refresh_recent()
+
+    @staticmethod
+    def _paste_target_matches(origin: str, current: str) -> bool:
+        # no origin recorded → preserve the old always-paste behavior
+        return not origin or origin == current
+
+    def _notify_ready(self, text: str) -> None:
+        try:
+            preview = (text[:40] + "…") if len(text) > 41 else text
+            rumps.notification("Accio", "Dictation ready — ⌘V to paste", preview)
+        except Exception as e:
+            print(f"notification failed ({e}); text is on the clipboard and in Recent")
+
+    def _copy_recent(self, sender) -> None:
+        copy_only(getattr(sender, "_full_text", ""))
+
+    def _refresh_recent(self) -> None:
+        items = history.recent(RECENT_COUNT)
+        for slot, rec in zip(self._recent_slots, items):
+            t = rec.get("text", "")
+            slot.title = (t[:47] + "…") if len(t) > 48 else (t or "(empty)")
+            slot._full_text = t
+            slot.set_callback(self._copy_recent)
+        for slot in self._recent_slots[len(items):]:
+            slot.title = "(empty)"
+            slot._full_text = ""
+            slot.set_callback(None)  # disable empty slots
 
     def _on_utterance_done(self) -> None:
         self.title = IDLE
@@ -242,73 +257,29 @@ class AccioApp(rumps.App):
     # --- audio worker: owns all CoreAudio calls, serially ---
 
     def _audio_worker(self) -> None:
+        # recorder.start()/stop() are subprocess-backed and self-healing: they
+        # return promptly even when the audio helper wedges (it gets killed and
+        # respawned), so no in-process timeout/restart is needed here.
         while True:
             event = self._audio_events.get()
             try:
                 if event == "start":
-                    ok, _, dt = _call_with_timeout(
-                        self.recorder.start, RECORDER_TIMEOUT_SECONDS
-                    )
-                    if not ok:
-                        self._recover_recorder("start")
-                    else:
-                        self._wedge_count = 0
-                        if dt > 0.5:
-                            print(f"recorder.start slow: {dt:.2f}s")
+                    self.recorder.start()
                 elif event == "stop":
-                    ok, audio, dt = _call_with_timeout(
-                        self.recorder.stop, RECORDER_TIMEOUT_SECONDS
-                    )
+                    audio = self.recorder.stop()
                     self._recording_since = None
-                    if not ok:
-                        self._recover_recorder("stop")
-                        continue
-                    self._wedge_count = 0
-                    if dt > 0.5:
-                        print(f"recorder.stop slow: {dt:.2f}s")
                     if self.recorder.duration(audio) < self.cfg.min_utterance_seconds:
                         self.title = IDLE
                         continue
                     self.title = PROCESSING
-                    # capture tone now, while the target app is still frontmost
-                    self.pipeline.submit(audio, tone_for_app(frontmost_app_name()))
+                    # capture tone + origin app now, while the target is still
+                    # frontmost — origin decides where the result may auto-paste
+                    origin = frontmost_app_name()
+                    self.pipeline.submit(audio, tone_for_app(origin), origin)
             except Exception as e:
                 print(f"Audio worker error on {event!r}: {e}")
                 self._recording_since = None
                 self.title = IDLE
-
-    def _recover_recorder(self, where: str) -> None:
-        # a CoreAudio call wedged. First try a cheap rebuild in case it was a
-        # transient hiccup; the fresh Recorder still shares the process-global
-        # PortAudio library, so if that library itself is wedged the very next
-        # start/stop wedges too. On a repeat wedge, only a process restart clears
-        # it — launchd relaunches us with a fresh audio subsystem.
-        # ponytail: each wedge leaks one blocked daemon thread; the escalating
-        # restart caps the damage. Killing a thread mid-C-call isn't safe.
-        self._wedge_count += 1
-        print(
-            f"recorder.{where} wedged (>{RECORDER_TIMEOUT_SECONDS}s); "
-            f"rebuilding recorder (wedge #{self._wedge_count}), dropping this recording"
-        )
-        self.recorder = Recorder()
-        self._recording_since = None
-        self.title = IDLE
-        if self._wedge_count >= 2:
-            print("audio subsystem wedged repeatedly; restarting the app to reset it")
-            self._restart_process()
-
-    def _restart_process(self) -> None:
-        import os
-
-        from accio import service
-
-        try:
-            service.start()  # launchctl kickstart -k: launchd kills + relaunches us
-        except Exception as e:
-            # not under launchd (dev run) or kickstart failed: abort so the
-            # LaunchAgent's KeepAlive(Crashed) relaunches a clean process
-            print(f"kickstart failed ({e}); aborting for relaunch")
-            os.abort()
 
     # --- watchdog: recover from a dead listener or a missed release event ---
 

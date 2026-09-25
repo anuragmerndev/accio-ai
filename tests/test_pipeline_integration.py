@@ -29,7 +29,7 @@ def test_pipeline_transcribes_across_threads(tmp_path: Path):
     pipe = Pipeline(
         cfg,
         on_ready=lambda llm: None,
-        on_result=results.append,
+        on_result=lambda text, origin: results.append(text),
         on_done=done.set,
     )
 
