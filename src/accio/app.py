@@ -14,6 +14,7 @@ import time
 
 import rumps
 
+from accio import history
 from accio.audio import Recorder
 from accio.config import Config, load_config
 from accio.context import frontmost_app_name, tone_for_app
@@ -29,6 +30,8 @@ WATCHDOG_INTERVAL_SECONDS = 5
 # typing never opens the audio stream — which otherwise thrashes CoreAudio and
 # eventually wedges the audio worker.
 HOLD_TO_TALK_SECONDS = 0.25
+# how many past dictations to keep in the menu-bar "Recent" submenu
+RECENT_COUNT = 10
 # macOS virtual keycodes for our hotkeys (names match accio.hotkey.KEY_MAP),
 # used to poll a non-modifier key's physical state (f13). Modifier keys are
 # polled by flag mask instead — see _MODIFIER_FLAG — because per-keycode
@@ -102,10 +105,15 @@ class AccioApp(rumps.App):
         self.cfg = cfg
         self.recorder = Recorder()
         self.enabled = True
+        self._recent_slots = [rumps.MenuItem("(empty)") for _ in range(RECENT_COUNT)]
+        recent_menu = rumps.MenuItem("Recent")
+        for slot in self._recent_slots:
+            recent_menu.add(slot)
         self.menu = [
             rumps.MenuItem("Enabled", callback=self._toggle_enabled),
             rumps.MenuItem("LLM polish", callback=self._toggle_polish),
             rumps.MenuItem("Stop", callback=self._stop),
+            recent_menu,
         ]
         self.menu["Enabled"].state = True
         self.menu["LLM polish"].state = cfg.llm_polish
@@ -130,6 +138,7 @@ class AccioApp(rumps.App):
         self.hotkey.start()
         self._watchdog_timer = rumps.Timer(self._watchdog, WATCHDOG_INTERVAL_SECONDS)
         self._watchdog_timer.start()
+        self._refresh_recent()  # populate from prior sessions' history
 
     def _on_models_ready(self, llm_available: bool) -> None:
         if not llm_available:
@@ -137,15 +146,52 @@ class AccioApp(rumps.App):
         self.title = IDLE
         print("Models loaded. Hold your hotkey and speak.")
 
-    def _on_text(self, text: str) -> None:
-        print("→ paste")
-        t0 = time.time()
-        try:
-            paste_text(text)
-        except Exception as e:
-            print(f"Paste failed ({e}); text left on clipboard")
+    def _on_text(self, text: str, origin: str = "") -> None:
+        # only auto-paste if the same app is still focused; if you moved away
+        # while it was transcribing, hold the text on the clipboard instead of
+        # firing ⌘V into the wrong place. Either way it's saved to history.
+        current = frontmost_app_name()
+        if self._paste_target_matches(origin, current):
+            try:
+                paste_text(text)
+            except Exception as e:
+                print(f"Paste failed ({e}); text left on clipboard")
+                copy_only(text)
+            pasted = True
+        else:
             copy_only(text)
-        print(f"← paste {time.time() - t0:.2f}s")
+            print(f"focus moved ({origin!r} → {current!r}); held on clipboard")
+            self._notify_ready(text)
+            pasted = False
+        history.append(text, pasted=pasted)
+        self._refresh_recent()
+
+    @staticmethod
+    def _paste_target_matches(origin: str, current: str) -> bool:
+        # no origin recorded → preserve the old always-paste behavior
+        return not origin or origin == current
+
+    def _notify_ready(self, text: str) -> None:
+        try:
+            preview = (text[:40] + "…") if len(text) > 41 else text
+            rumps.notification("Accio", "Dictation ready — ⌘V to paste", preview)
+        except Exception as e:
+            print(f"notification failed ({e}); text is on the clipboard and in Recent")
+
+    def _copy_recent(self, sender) -> None:
+        copy_only(getattr(sender, "_full_text", ""))
+
+    def _refresh_recent(self) -> None:
+        items = history.recent(RECENT_COUNT)
+        for slot, rec in zip(self._recent_slots, items):
+            t = rec.get("text", "")
+            slot.title = (t[:47] + "…") if len(t) > 48 else (t or "(empty)")
+            slot._full_text = t
+            slot.set_callback(self._copy_recent)
+        for slot in self._recent_slots[len(items):]:
+            slot.title = "(empty)"
+            slot._full_text = ""
+            slot.set_callback(None)  # disable empty slots
 
     def _on_utterance_done(self) -> None:
         self.title = IDLE
@@ -226,8 +272,10 @@ class AccioApp(rumps.App):
                         self.title = IDLE
                         continue
                     self.title = PROCESSING
-                    # capture tone now, while the target app is still frontmost
-                    self.pipeline.submit(audio, tone_for_app(frontmost_app_name()))
+                    # capture tone + origin app now, while the target is still
+                    # frontmost — origin decides where the result may auto-paste
+                    origin = frontmost_app_name()
+                    self.pipeline.submit(audio, tone_for_app(origin), origin)
             except Exception as e:
                 print(f"Audio worker error on {event!r}: {e}")
                 self._recording_since = None
